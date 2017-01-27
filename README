@@ -1,0 +1,51 @@
+cttv
+minimal twitch.tv terminal frontend for streamlink
+
+install:
+        git clone
+        cd cttv
+        sudo make install
+
+dependencies:
+build:
+        - C compiler
+        - libcurl
+        - jansson
+        - ncurses
+runtime:
+        - https://github.com/streamlink/streamlink
+        - xsel (for clipboard functionality)
+
+usage: cttv [optional file]
+        Q       die
+        Space   toggle default/title only display
+        R       refresh status
+        
+        down/up
+        j/k     
+        J/K     
+        MOUSE1
+        HOME
+        END     alter selection
+                
+                run stream with
+        Enter   medium,source
+        S       source
+        H       high
+        L       low
+        P       mobile
+        W       worst
+        A       audio
+                quality
+
+        C       https://twitch.tv/channel_name to clipboard
+        G       game to clipboard
+        T       title to clipboard
+
+        default file is ~/.cttvrc
+        one non-URL channel name per line
+        Unix line endings, utf8 and 100 or less lines are expected
+
+
+license:
+        see the LICENSE file
