@@ -261,13 +261,11 @@ requests(struct status *stat, struct entry_chan **ent,
         }
 
         if (JSON_ARRAY != json_typeof(streams)) {
-                curl_easy_cleanup(crl);
-                json_decref(root);
                 stat->n_onl = 0;
                 *name = 0;
                 *gam = 0;
                 *title = 0;
-                return;
+                goto cleanup;
         }
 
         stat->n_onl = json_array_size(streams);
@@ -295,6 +293,7 @@ requests(struct status *stat, struct entry_chan **ent,
                 (*title)[i].s[sizeof(struct entry_title) - 1] = 0;
         }
 
+cleanup:
         json_decref(root);
         curl_easy_cleanup(crl);
         free(json_buf.p);
