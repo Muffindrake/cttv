@@ -12,6 +12,8 @@ build:
         - libcurl
         - jansson
         - ncurses
+        - libbsd
+
 runtime:
         - https://github.com/streamlink/streamlink
         - xsel (for clipboard functionality)

@@ -1,9 +1,9 @@
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include <unistd.h>
+#include <bsd/string.h>
 
 #include <curl/curl.h>
 #include <jansson.h>
@@ -13,7 +13,7 @@
 &limit=100&stream_type=live&api_version=3\
 &client_id=onsyu6idu0o41dl4ixkofx6pqq7ghn"
 
-#define SBUF 1<<12
+#define SBUF (1<<12)
 
 const char *help = ""
 "Read the source file or https://github.com/muffindrake/cttv for help.\n";
@@ -198,6 +198,7 @@ requests(struct status *stat, struct entry_chan **ent,
 {       
         static struct mem_data json_buf;
         static size_t i;
+        static size_t offset;
         static CURL *crl;
         static CURLcode crlcode;
         static json_t *root;
@@ -227,9 +228,11 @@ requests(struct status *stat, struct entry_chan **ent,
         }
 
         s_buf[0] = 0;
-        for (i = 0; i < stat->nstreams; i++)
-                strcat(s_buf, (*ent)[i].s), strcat(s_buf, ",");
-        s_buf[strlen(s_buf) - 1] = 0;
+        for (i = 0, offset = 0; i < stat->nstreams; i++) {
+                offset += strlcat(s_buf + offset, (*ent)[i].s, SBUF); 
+                offset += strlcat(s_buf + offset, ",", SBUF);
+        }
+        s_buf[SBUF - 1] = 0;
 
         int ign = snprintf(urlbuf, SBUF, TTVAPI, s_buf);
         (void) ign;

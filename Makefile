@@ -1,8 +1,8 @@
 CFLAGS := -Ofast -march=native
 DCFLAGS := -Ofast
-CFLAGS += `pkg-config jansson ncursesw libcurl --cflags`
-DCFLAGS += `pkg-config jansson ncursesw libcurl --cflags`
-LFLAGS := `pkg-config jansson ncursesw libcurl --libs`
+CFLAGS += `pkg-config jansson ncursesw libcurl libbsd --cflags`
+DCFLAGS += `pkg-config jansson ncursesw libcurl libbsd --cflags`
+LFLAGS := `pkg-config jansson ncursesw libcurl libbsd --libs`
 
 prefix := /usr/local
 
