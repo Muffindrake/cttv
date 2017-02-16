@@ -230,9 +230,9 @@ requests(struct status *stat, struct entry_chan **ent,
         s_buf[0] = 0;
         for (i = 0, offset = 0; i < stat->nstreams; i++) {
                 offset += strlcat(s_buf + offset, (*ent)[i].s, 
-                                SBUF - (offset ? offset - 1 : 0)); 
+                                offset ? SBUF - (offset + 1) : SBUF); 
                 offset += strlcat(s_buf + offset, ",", 
-                                SBUF - (offset ? offset - 1 : 0));
+                                offset ? SBUF - (offset + 1) : SBUF);
         }
         s_buf[SBUF - 1] = 0;
 
