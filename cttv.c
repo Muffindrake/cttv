@@ -94,8 +94,10 @@ get_lines(char *path, struct entry_chan **ent, char *s_buf)
         
         *ent = malloc(n * sizeof(struct entry_chan));
         for (i = 0; i < n; i++) {
-                if (!fgets(s_buf, SBUF, f))
+                if (!fgets(s_buf, SBUF, f)) {
+                        n = 0; 
                         goto err;
+                }
                 l = strlen(s_buf);
                 if (l > 0)
                         s_buf[l - 1] = 0;
@@ -103,12 +105,10 @@ get_lines(char *path, struct entry_chan **ent, char *s_buf)
                 strncpy((*ent)[i].s, s_buf, sizeof(struct entry_chan) - 1);
                 (*ent)[i].s[sizeof(struct entry_chan) - 1] = 0;
         }
-
-        fclose(f);
-        return n;
+        
 err:
         fclose(f);
-        return 0;
+        return n;
 }
 
 static void
@@ -124,7 +124,7 @@ scroll_up(struct status *stat)
         }
 
         stat->cur--;
-        if (stat->n_onl > (size_t) stat->h && stat->scry != 0)
+        if (stat->n_onl > (size_t) stat->h && stat->scry)
                 stat->scry--;
 }
 
@@ -224,7 +224,7 @@ requests(struct status *stat, struct entry_chan **ent,
         if (!(crl = curl_easy_init())) {
                 endwin();
                 fprintf(stderr, "unable to initalize curl_easy\n");
-                exit(-1);
+                exit(1);
         }
 
         s_buf[0] = 0;
@@ -236,8 +236,7 @@ requests(struct status *stat, struct entry_chan **ent,
         }
         s_buf[SBUF - 1] = 0;
 
-        int ign = snprintf(urlbuf, SBUF, TTVAPI, s_buf);
-        (void) ign;
+        snprintf(urlbuf, SBUF, TTVAPI, s_buf);
 
         curl_easy_setopt(crl, CURLOPT_URL, urlbuf);
         curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, mem_write_callback);
@@ -247,7 +246,7 @@ requests(struct status *stat, struct entry_chan **ent,
                 endwin();
                 fprintf(stderr, "unable to perform GET request: %s\n", 
                                 curl_easy_strerror(crlcode));
-                exit(-1);
+                exit(1);
         }
         
         root = json_loads(json_buf.p, 0, &error);
@@ -255,14 +254,14 @@ requests(struct status *stat, struct entry_chan **ent,
                 endwin();
                 fprintf(stderr, "unable to decode JSON: line %d: %s\n",
                                 error.line, error.text);
-                exit(-1);
+                exit(1);
         }
         
         streams = json_object_get(root, "streams");
         if (!streams) {
                 endwin();
                 fprintf(stderr, "unable to get streams object\n");
-                exit(-1);
+                exit(1);
         }
 
         if (JSON_ARRAY != json_typeof(streams)) {
@@ -345,7 +344,8 @@ draw_stat(struct status *stat, struct entry_title *title)
 
         i = 0;
         y = -stat->scry;
-        for (; i < (int) stat->n_onl && y < stat->h; i++, y = i - stat->scry) {
+        for (; (size_t) i < stat->n_onl && y < stat->h
+                        ; i++, y = i - stat->scry) {
                 if (y < 0)
                         continue;
 
@@ -390,7 +390,7 @@ main(int argc, char **argv)
         setlocale(LC_ALL, "");
         if (argc > 2) {
                 fprintf(stderr, "Requires 1 argument, got %d\n", argc - 1);
-                return -1;
+                return 1;
         }
         
         static char s_buf[SBUF];
@@ -408,17 +408,17 @@ main(int argc, char **argv)
                 snprintf(s_buf, SBUF, "%s/.cttvrc", getenv("HOME"));
                 if (!(stat.nstreams = get_lines(s_buf, &ent, s_buf))) {
                         fprintf(stderr, "unable to parse lines in file\n");
-                        return -1;
+                        return 1;
                 }
         }
-        else if (!strcmp(argv[1], "--help")) {
+        else if (!strncmp(argv[1], "--help", 6)) {
                 printf("%s", help);
                 return 0;
         }
         else {
                 if (!(stat.nstreams = get_lines(argv[1], &ent, s_buf))) {
                         fprintf(stderr, "unable to parse lines in file\n");
-                        return -1;
+                        return 1;
                 }
         }
 
