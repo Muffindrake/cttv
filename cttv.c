@@ -13,8 +13,6 @@
 &limit=100&stream_type=live&api_version=3\
 &client_id=onsyu6idu0o41dl4ixkofx6pqq7ghn"
 
-#define SBUF (1<<12)
-
 const char *help = ""
 "Read the source file or https://github.com/muffindrake/cttv for help.\n";
 
@@ -74,7 +72,7 @@ mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
 }
 
 static size_t
-get_lines(char *path, struct entry_chan **ent, char *s_buf)
+get_lines(char *path, struct entry_chan **ent, char *s_buf, size_t sbsz)
 {
         size_t n;
         size_t l;
@@ -94,7 +92,7 @@ get_lines(char *path, struct entry_chan **ent, char *s_buf)
         
         *ent = malloc(n * sizeof(struct entry_chan));
         for (i = 0; i < n; i++) {
-                if (!fgets(s_buf, SBUF, f)) {
+                if (!fgets(s_buf, sbsz, f)) {
                         n = 0; 
                         goto err;
                 }
@@ -169,12 +167,12 @@ left_click(struct status *stat, MEVENT *mev)
 
 static void
 run_live(struct status *stat, struct entry_chan *name, const char *q, 
-                char *s_buf)
+                char *s_buf, size_t sbsz)
 {
         if (!stat->n_onl)
                 return;
 
-        snprintf(s_buf, SBUF,
+        snprintf(s_buf, sbsz,
                         "streamlink twitch.tv/%s %s "
                         "> /dev/null 2> /dev/null &",
                         name[stat->cur].s, q);
@@ -183,9 +181,9 @@ run_live(struct status *stat, struct entry_chan *name, const char *q,
 }
 
 static void
-to_clipboard(char *data, char *s_buf)
+to_clipboard(char *data, char *s_buf, size_t sbsz)
 {
-        snprintf(s_buf, SBUF, "echo -n \"%s\" | xsel -psb", 
+        snprintf(s_buf, sbsz, "echo -n \"%s\" | xsel -psb", 
                         data);
         system(s_buf);
         usleep(1000);
@@ -194,7 +192,8 @@ to_clipboard(char *data, char *s_buf)
 static void
 requests(struct status *stat, struct entry_chan **ent,
                 struct entry_chan **name, struct entry_game **gam, 
-                struct entry_title **title, char *s_buf, char *urlbuf)
+                struct entry_title **title, char *s_buf, size_t sbsz, 
+                char *urlbuf, size_t ubsz)
 {       
         static struct mem_data json_buf;
         static size_t i;
@@ -230,13 +229,13 @@ requests(struct status *stat, struct entry_chan **ent,
         s_buf[0] = 0;
         for (i = 0, offset = 0; i < stat->nstreams; i++) {
                 offset += strlcat(s_buf + offset, (*ent)[i].s, 
-                                offset ? SBUF - (offset + 1) : SBUF); 
+                                offset ? sbsz - (offset + 1) : sbsz); 
                 offset += strlcat(s_buf + offset, ",", 
-                                offset ? SBUF - (offset + 1) : SBUF);
+                                offset ? sbsz - (offset + 1) : sbsz);
         }
-        s_buf[SBUF - 1] = 0;
+        s_buf[sbsz - 1] = 0;
 
-        snprintf(urlbuf, SBUF, TTVAPI, s_buf);
+        snprintf(urlbuf, ubsz, TTVAPI, s_buf);
 
         curl_easy_setopt(crl, CURLOPT_URL, urlbuf);
         curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, mem_write_callback);
@@ -393,8 +392,8 @@ main(int argc, char **argv)
                 return 1;
         }
         
-        static char s_buf[SBUF];
-        static char urlbuf[SBUF];
+        static char s_buf[4096];
+        static char urlbuf[4096];
         static struct status stat;
         static struct entry_chan *ent;
         static struct entry_chan *name;
@@ -405,8 +404,9 @@ main(int argc, char **argv)
         static MEVENT mevent;
 
         if (argc == 1) {
-                snprintf(s_buf, SBUF, "%s/.cttvrc", getenv("HOME"));
-                if (!(stat.nstreams = get_lines(s_buf, &ent, s_buf))) {
+                snprintf(s_buf, sizeof s_buf, "%s/.cttvrc", getenv("HOME"));
+                if (!(stat.nstreams = get_lines(s_buf, &ent, s_buf, 
+                                                sizeof s_buf))) {
                         fprintf(stderr, "unable to parse lines in file\n");
                         return 1;
                 }
@@ -416,7 +416,8 @@ main(int argc, char **argv)
                 return 0;
         }
         else {
-                if (!(stat.nstreams = get_lines(argv[1], &ent, s_buf))) {
+                if (!(stat.nstreams = get_lines(argv[1], &ent, s_buf, 
+                                                sizeof s_buf))) {
                         fprintf(stderr, "unable to parse lines in file\n");
                         return 1;
                 }
@@ -437,7 +438,8 @@ main(int argc, char **argv)
         title = 0;
 
         getmaxyx(stdscr, stat.h, ch);
-        requests(&stat, &ent, &name, &gam, &title, s_buf, urlbuf);
+        requests(&stat, &ent, &name, &gam, &title, s_buf, sizeof s_buf, 
+                        urlbuf, sizeof urlbuf);
         draw_all(&stat, name, gam, title);
 poll:
         ch = getch();
@@ -471,7 +473,8 @@ poll:
                 break;
         case 'R':
                 getmaxyx(stdscr, stat.h, ch);
-                requests(&stat, &ent, &name, &gam, &title, s_buf, urlbuf);
+                requests(&stat, &ent, &name, &gam, &title, s_buf, sizeof s_buf, 
+                                urlbuf, sizeof urlbuf);
                 break;
         case ' ':
                 stat.stat_only = !stat.stat_only;
@@ -479,42 +482,42 @@ poll:
         case KEY_ENTER:
         case '\r':
         case '\n':
-                run_live(&stat, name, quality[0], s_buf);
+                run_live(&stat, name, quality[0], s_buf, sizeof s_buf);
                 goto poll;
         case 'S':
-                run_live(&stat, name, quality[1], s_buf);
+                run_live(&stat, name, quality[1], s_buf, sizeof s_buf);
                 goto poll;
         case 'H':
-                run_live(&stat, name, quality[2], s_buf);
+                run_live(&stat, name, quality[2], s_buf, sizeof s_buf);
                 goto poll;
         case 'L':
-                run_live(&stat, name, quality[3], s_buf);
+                run_live(&stat, name, quality[3], s_buf, sizeof s_buf);
                 goto poll;
         case 'P':
-                run_live(&stat, name, quality[4], s_buf);
+                run_live(&stat, name, quality[4], s_buf, sizeof s_buf);
                 goto poll;
         case 'W':
-                run_live(&stat, name, quality[5], s_buf);
+                run_live(&stat, name, quality[5], s_buf, sizeof s_buf);
                 goto poll;
         case 'A':
-                run_live(&stat, name, quality[6], s_buf);
+                run_live(&stat, name, quality[6], s_buf, sizeof s_buf);
                 goto poll;
         case 'C':
                 if (!stat.n_onl)
                         goto poll;
-                snprintf(urlbuf, SBUF, "https://twitch.tv/%s", 
+                snprintf(urlbuf, sizeof s_buf, "https://twitch.tv/%s", 
                                 name[stat.cur].s);
-                to_clipboard(urlbuf, s_buf);
+                to_clipboard(urlbuf, s_buf, sizeof s_buf);
                 goto poll;
         case 'G':
                 if (!stat.n_onl)
                         goto poll;
-                to_clipboard(gam[stat.cur].s, s_buf);
+                to_clipboard(gam[stat.cur].s, s_buf, sizeof s_buf);
                 goto poll;
         case 'T':
                 if (!stat.n_onl)
                         goto poll;
-                to_clipboard(title[stat.cur].s, s_buf);
+                to_clipboard(title[stat.cur].s, s_buf, sizeof s_buf);
                 goto poll;
         case KEY_RESIZE:
                 stat.cur = 0;
