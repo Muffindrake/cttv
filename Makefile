@@ -4,7 +4,7 @@ CFLAGS += `pkg-config jansson ncursesw libcurl libbsd --cflags`
 DCFLAGS += `pkg-config jansson ncursesw libcurl libbsd --cflags`
 LFLAGS := `pkg-config jansson ncursesw libcurl libbsd --libs`
 
-prefix := /usr/local
+prefix ?= /usr/local
 
 all: cttv.c
 	$(CC) $(CFLAGS) -std=c11 -Wall -Wextra -o cttv cttv.c $(LFLAGS)

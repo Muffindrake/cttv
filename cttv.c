@@ -31,16 +31,20 @@ struct mem_data {
         size_t len;
 };
 
-struct entry_chan {
-        char s[26];
+struct chan_ent {
+        char **offset;
+        size_t len;
+        char *data;
 };
 
-struct entry_game {
-        char s[64];
-};
-
-struct entry_title {
-        char s[256];
+struct resp_ent {
+        char  *name_data;
+        char **name_offset;
+        char  *game_data;
+        char **game_offset;
+        char  *title_data;
+        char **title_offset;
+        size_t len;
 };
 
 struct status {
@@ -48,10 +52,6 @@ struct status {
         int cur;
         int scry;
         unsigned int stat_only  :1;
-        
-        size_t len;
-        size_t n_onl;
-        size_t nstreams;
 };
 
 static size_t
@@ -72,11 +72,11 @@ mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
 }
 
 static size_t
-get_lines(char *path, struct entry_chan **ent, char *s_buf, size_t sbsz)
+get_lines(char *path, struct chan_ent *ent)
 {
         size_t n;
-        size_t l;
         size_t i;
+        size_t l;
 
         FILE *f = fopen(path, "r");
         if (!f)
@@ -84,98 +84,84 @@ get_lines(char *path, struct entry_chan **ent, char *s_buf, size_t sbsz)
 
         for (n = 0; EOF != fscanf(f, "%*[^\n]") && EOF != fscanf(f, "%*c");)
                 n++;
-        rewind(f);
-        if (n > 100)
-                n = 100;
         if (!n)
                 goto err;
         
-        *ent = malloc(n * sizeof(struct entry_chan));
-        for (i = 0; i < n; i++) {
-                if (!fgets(s_buf, sbsz, f)) {
-                        n = 0; 
-                        goto err;
-                }
-                l = strlen(s_buf);
-                if (l > 0)
-                        s_buf[l - 1] = 0;
-                
-                strncpy((*ent)[i].s, s_buf, sizeof(struct entry_chan) - 1);
-                (*ent)[i].s[sizeof(struct entry_chan) - 1] = 0;
+        ent->data = malloc((l = ftell(f)) + 1);
+        rewind(f);
+        ent->offset = malloc(n * sizeof(void *));
+
+        l = fread(ent->data, 1, l, f);
+        ent->data[l - 1] = 0;
+
+        ent->offset[0] = ent->data;
+        for (i = 1; i < n; i++) {
+                ent->offset[i] = strchr(ent->offset[i - 1], '\n') + 1;
+                *(ent->offset[i] - 1) = 0;
         }
-        
+
 err:
         fclose(f);
         return n;
 }
 
 static void
-scroll_up(struct status *stat)
+scroll_up(struct status *stat, size_t n_onl)
 {
-        if (!stat->n_onl)
-                return;
         if (!stat->cur) {
-                stat->cur = stat->n_onl - 1;
-                if (stat->n_onl > (size_t) stat->h)
-                        stat->scry = stat->n_onl - stat->h;
+                stat->cur = n_onl - 1;
+                if (n_onl > (size_t) stat->h)
+                        stat->scry = n_onl - stat->h;
                 return;
         }
 
         stat->cur--;
-        if (stat->n_onl > (size_t) stat->h && stat->scry)
+        if (n_onl > (size_t) stat->h && stat->scry)
                 stat->scry--;
 }
 
 static void
-scroll_down(struct status *stat)
+scroll_down(struct status *stat, size_t n_onl)
 {
-        if (!stat->n_onl)
-                return;
-        if ((size_t) stat->cur == stat->n_onl - 1) {
+        if ((size_t) stat->cur == n_onl - 1) {
                 stat->cur = 0;
-                if (stat->n_onl > (size_t) stat->h)
+                if (n_onl > (size_t) stat->h)
                         stat->scry = 0;
                 return;
         }
 
         stat->cur++;
-        if (stat->n_onl > (size_t) stat->h 
-                        && (size_t) stat->scry < stat->n_onl - (size_t) stat->h)
+        if (n_onl > (size_t) stat->h 
+                        && (size_t) stat->scry < n_onl - (size_t) stat->h)
                 stat->scry++;
 }
 
 static void
-left_click(struct status *stat, MEVENT *mev)
+left_click(struct status *stat, size_t n_onl, MEVENT *mev)
 {
-        if (!stat->n_onl)
+        if ((size_t) mev->y > n_onl - 1)
                 return;
-        if ((size_t) mev->y > stat->n_onl - 1)
-                return;
-        if (stat->n_onl < (size_t) stat->h) {
+        if (n_onl < (size_t) stat->h) {
                 stat->cur = mev->y;
                 return;
         }
         stat->cur = stat->scry + mev->y;
-        if ((size_t) stat->cur > stat->n_onl - 1)
-                stat->cur = stat->n_onl - 1;
+        if ((size_t) stat->cur > n_onl - 1)
+                stat->cur = n_onl - 1;
         stat->scry = stat->cur - 1;
         if (stat->scry < 0)
                 stat->scry = 0;
-        if ((size_t) stat->scry > stat->n_onl - (size_t) stat->h)
-                stat->scry = stat->n_onl - stat->h;
+        if ((size_t) stat->scry > n_onl - (size_t) stat->h)
+                stat->scry = n_onl - stat->h;
 }
 
 static void
-run_live(struct status *stat, struct entry_chan *name, const char *q, 
-                char *s_buf, size_t sbsz)
+run_live(char *data, const char *q, char *s_buf, size_t sbsz)
 {
-        if (!stat->n_onl)
-                return;
-
-        snprintf(s_buf, sbsz,
-                        "streamlink twitch.tv/%s %s "
-                        "> /dev/null 2> /dev/null &",
-                        name[stat->cur].s, q);
+        snprintf(s_buf, sbsz, "streamlink twitch.tv/%s %s "
+                        "> /dev/null 2> /dev/null &", 
+                        data, 
+                        q);
         system(s_buf);
         usleep(1000);
 }
@@ -183,41 +169,45 @@ run_live(struct status *stat, struct entry_chan *name, const char *q,
 static void
 to_clipboard(char *data, char *s_buf, size_t sbsz)
 {
-        snprintf(s_buf, sbsz, "echo -n \"%s\" | xsel -psb", 
-                        data);
+        snprintf(s_buf, sbsz, "echo -n \"%s\" | xsel -psb", data);
         system(s_buf);
         usleep(1000);
 }
 
 static void
-requests(struct status *stat, struct entry_chan **ent,
-                struct entry_chan **name, struct entry_game **gam, 
-                struct entry_title **title, char *s_buf, size_t sbsz, 
-                char *urlbuf, size_t ubsz)
+requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info, 
+                char *s_buf, size_t sbsz, char *urlbuf, size_t ubsz)
 {       
         static struct mem_data json_buf;
         static size_t i;
-        static size_t offset;
+        
         static CURL *crl;
         static CURLcode crlcode;
         static json_t *root;
         static json_t *streams;
         static json_t *element;
-        static json_t *channel;
+        static json_t *ch;
         static json_t *rname;
         static json_t *game;
         static json_t *status;
         static json_error_t error;
+        
+        static size_t n_offs;
+        static size_t g_offs;
+        static size_t t_offs;
 
         stat->cur = 0;
         stat->scry = 0;
-        json_buf.p = 0;
-        json_buf.len = 0;
+        memset(&json_buf, 0, sizeof(struct mem_data));
 
-        if (*name) {
-                free(*name);
-                free(*gam);
-                free(*title);
+        if (info->name_data) {
+                free(info->name_data);
+                free(info->name_offset);
+                free(info->game_data);
+                free(info->game_offset);
+                free(info->title_data);
+                free(info->title_offset);
+                memset(info, 0, sizeof(struct resp_ent));
         }
 
         if (!(crl = curl_easy_init())) {
@@ -227,13 +217,14 @@ requests(struct status *stat, struct entry_chan **ent,
         }
 
         s_buf[0] = 0;
-        for (i = 0, offset = 0; i < stat->nstreams; i++) {
-                offset += strlcat(s_buf + offset, (*ent)[i].s, 
-                                offset ? sbsz - (offset + 1) : sbsz); 
-                offset += strlcat(s_buf + offset, ",", 
-                                offset ? sbsz - (offset + 1) : sbsz);
+        for (i = 0, n_offs = 0; i < ent->len - 1; i++) {
+                n_offs += strlcat(s_buf + n_offs, ent->offset[i], 
+                                n_offs ? sbsz - (n_offs + 1) : sbsz); 
+                n_offs += strlcat(s_buf + n_offs, ",", 
+                                n_offs ? sbsz - (n_offs + 1) : sbsz);
         }
-        s_buf[sbsz - 1] = 0;
+        strlcat(s_buf + n_offs, ent->offset[i], 
+                        n_offs ? sbsz - (n_offs + 1) : sbsz);
 
         snprintf(urlbuf, ubsz, TTVAPI, s_buf);
 
@@ -264,36 +255,49 @@ requests(struct status *stat, struct entry_chan **ent,
         }
 
         if (JSON_ARRAY != json_typeof(streams)) {
-                stat->n_onl = 0;
-                *name = 0;
-                *gam = 0;
-                *title = 0;
                 goto cleanup;
         }
 
-        stat->n_onl = json_array_size(streams);
-        *name = malloc(stat->n_onl * sizeof(struct entry_chan));
-        *gam = malloc(stat->n_onl * sizeof(struct entry_game));
-        *title = malloc(stat->n_onl * sizeof(struct entry_title));
-        for (i = 0; i < stat->n_onl; i++) {
+        info->len = json_array_size(streams);
+
+        for (i = 0, n_offs = 0, g_offs = 0, t_offs = 0
+                        ; i < info->len
+                        ; i++) {
                 element = json_array_get(streams, i);
-                channel = json_object_get(element, "channel");
+                ch = json_object_get(element, "channel");
 
-                rname   = json_object_get(channel, "name");
-                game    = json_object_get(channel, "game");
-                status  = json_object_get(channel, "status");
-                
-                strncpy((*name)[i].s, json_string_value(rname),
-                                sizeof(struct entry_chan) - 1);
-                (*name)[i].s[sizeof(struct entry_chan) - 1] = 0;
+                n_offs += json_string_length(json_object_get(ch, "name")) + 1;
+                g_offs += json_string_length(json_object_get(ch, "game")) + 1;
+                t_offs += json_string_length(json_object_get(ch, "status")) + 1;
+        }
 
-                strncpy((*gam)[i].s, json_string_value(game), 
-                                sizeof(struct entry_game) - 1);
-                (*gam)[i].s[sizeof(struct entry_game) - 1] = 0;
+        info->name_data = malloc(n_offs);
+        info->game_data = malloc(g_offs);
+        info->title_data = malloc(t_offs);
+        info->name_offset = malloc(info->len * sizeof(void *));
+        info->game_offset = malloc(info->len * sizeof(void *));
+        info->title_offset = malloc(info->len * sizeof(void *));        
 
-                strncpy((*title)[i].s, json_string_value(status), 
-                                sizeof(struct entry_title) - 1);
-                (*title)[i].s[sizeof(struct entry_title) - 1] = 0;
+        for (i = 0, n_offs = 0, g_offs = 0, t_offs = 0
+                        ; i < info->len
+                        ; i++) {
+                element = json_array_get(streams, i);
+                ch = json_object_get(element, "channel");
+
+                rname = json_object_get(ch, "name");
+                strcpy(info->name_data + n_offs, json_string_value(rname));
+                info->name_offset[i] = info->name_data + n_offs;
+                n_offs += json_string_length(rname) + 1;
+
+                game = json_object_get(ch, "game");
+                strcpy(info->game_data + g_offs, json_string_value(game));
+                info->game_offset[i] = info->game_data + g_offs;
+                g_offs += json_string_length(game) + 1;
+
+                status = json_object_get(ch, "status");
+                strcpy(info->title_data + t_offs, json_string_value(status));
+                info->title_offset[i] = info->title_data + t_offs;
+                t_offs += json_string_length(status) + 1;
         }
 
 cleanup:
@@ -303,29 +307,28 @@ cleanup:
 }
 
 static void
-draw_def(struct status *stat, struct entry_chan *name, struct entry_game *gam,
-                struct entry_title *title)
+draw_def(struct status *stat, struct resp_ent *info)
 {
         static int i;
         static int y;
 
         i = 0;
         y = -stat->scry;
-        for (; (size_t) i < stat->n_onl && y < stat->h; 
-                        i++, y = i - stat->scry) {
+        for (; (size_t) i < info->len && y < stat->h
+                        ; i++, y = i - stat->scry) {
                 if (y < 0)
                         continue;
 
                 if (stat->cur == i)
                         attron(A_UNDERLINE);
 
-                mvprintw(y, 0, "%s ", name[i].s);
+                mvprintw(y, 0, "%s ", info->name_offset[i]);
                 attron(A_STANDOUT);
-                printw("%s", gam[i].s);
+                printw("%s", info->game_offset[i]);
                 attroff(A_STANDOUT);
                 printw(" ");
                 attron(A_BOLD);
-                printw("%s", title[i].s);
+                printw("%s", info->title_offset[i]);
                 attroff(A_BOLD);
 
                 if (stat->cur == i)
@@ -336,14 +339,14 @@ draw_def(struct status *stat, struct entry_chan *name, struct entry_game *gam,
 }
 
 static void
-draw_stat(struct status *stat, struct entry_title *title)
+draw_stat(struct status *stat, struct resp_ent *info)
 {
         static int i;
         static int y;
 
         i = 0;
         y = -stat->scry;
-        for (; (size_t) i < stat->n_onl && y < stat->h
+        for (; (size_t) i < info->len && y < stat->h
                         ; i++, y = i - stat->scry) {
                 if (y < 0)
                         continue;
@@ -352,7 +355,7 @@ draw_stat(struct status *stat, struct entry_title *title)
                         attron(A_UNDERLINE);
 
                 attron(A_BOLD);
-                mvprintw(y, 0, "%s", title[i].s);
+                mvprintw(y, 0, "%s", info->title_offset[i]);
                 attroff(A_BOLD);
 
                 if (stat->cur == i)
@@ -363,12 +366,11 @@ draw_stat(struct status *stat, struct entry_title *title)
 }
 
 static void
-draw_all(struct status *stat, struct entry_chan *name,
-                struct entry_game *gam, struct entry_title *title)
+draw_all(struct status *stat, struct resp_ent *info)
 {
         clear();
 
-        if (!stat->n_onl) {
+        if (!info->len) {
                 mvprintw(0, 0, "no streams online or API dead\n"
                                 "hit R to refresh");
                 refresh();
@@ -376,9 +378,9 @@ draw_all(struct status *stat, struct entry_chan *name,
         }
 
         if (!stat->stat_only)
-                draw_def(stat, name, gam, title);
+                draw_def(stat, info);
         else
-                draw_stat(stat, title);
+                draw_stat(stat, info);
 
         refresh();
 }
@@ -395,18 +397,15 @@ main(int argc, char **argv)
         static char s_buf[4096];
         static char urlbuf[4096];
         static struct status stat;
-        static struct entry_chan *ent;
-        static struct entry_chan *name;
-        static struct entry_game *gam;
-        static struct entry_title *title;
+        static struct chan_ent ent;
+        static struct resp_ent info;
         static int ch;
         static size_t i;
         static MEVENT mevent;
 
         if (argc == 1) {
                 snprintf(s_buf, sizeof s_buf, "%s/.cttvrc", getenv("HOME"));
-                if (!(stat.nstreams = get_lines(s_buf, &ent, s_buf, 
-                                                sizeof s_buf))) {
+                if (!(ent.len = get_lines(s_buf, &ent))) {
                         fprintf(stderr, "unable to parse lines in file\n");
                         return 1;
                 }
@@ -415,12 +414,9 @@ main(int argc, char **argv)
                 printf("%s", help);
                 return 0;
         }
-        else {
-                if (!(stat.nstreams = get_lines(argv[1], &ent, s_buf, 
-                                                sizeof s_buf))) {
-                        fprintf(stderr, "unable to parse lines in file\n");
-                        return 1;
-                }
+        else if (!(ent.len = get_lines(argv[1], &ent))) {
+                fprintf(stderr, "unable to parse lines in file\n");
+                return 1;
         }
 
         initscr();
@@ -430,17 +426,16 @@ main(int argc, char **argv)
         noecho();
         curs_set(0);
         mousemask(BUTTON1_PRESSED, 0);
+        
         curl_global_init(CURL_GLOBAL_DEFAULT);
 
         stat.stat_only = false;
-        name = 0;
-        gam = 0;
-        title = 0;
+        memset(&info, 0, sizeof(struct resp_ent));
 
         getmaxyx(stdscr, stat.h, ch);
-        requests(&stat, &ent, &name, &gam, &title, s_buf, sizeof s_buf, 
+        requests(&stat, &ent, &info, s_buf, sizeof s_buf, 
                         urlbuf, sizeof urlbuf);
-        draw_all(&stat, name, gam, title);
+        draw_all(&stat, &info);
 poll:
         ch = getch();
         switch (ch) {
@@ -448,32 +443,36 @@ poll:
                 goto end;
         case KEY_DOWN:
         case 'j':
-                scroll_down(&stat);
+                if (info.len)
+                        scroll_down(&stat, info.len);
                 break;
         case KEY_UP:
         case 'k':
-                scroll_up(&stat);
+                if (info.len)
+                        scroll_up(&stat, info.len);
                 break;
         case KEY_HOME:
                 stat.cur = 0;
                 stat.scry = 0;
                 break;
         case KEY_END:
-                stat.cur = stat.n_onl - 1;
-                if (stat.n_onl > (size_t) stat.h)
-                        stat.scry  = stat.n_onl - (size_t) stat.h;
+                stat.cur = info.len - 1;
+                if (info.len > (size_t) stat.h)
+                        stat.scry  = info.len - (size_t) stat.h;
                 break;
         case 'K':
-                for (i = 0; i < 5; i++)
-                        scroll_up(&stat);
+                if (info.len)
+                        for (i = 0; i < 5; i++)
+                                scroll_up(&stat, info.len);
                 break;
         case 'J':
-                for (i = 0; i < 5; i++)
-                        scroll_down(&stat);
+                if (info.len)
+                        for (i = 0; i < 5; i++)
+                                scroll_down(&stat, info.len);
                 break;
         case 'R':
                 getmaxyx(stdscr, stat.h, ch);
-                requests(&stat, &ent, &name, &gam, &title, s_buf, sizeof s_buf, 
+                requests(&stat, &ent, &info, s_buf, sizeof s_buf, 
                                 urlbuf, sizeof urlbuf);
                 break;
         case ' ':
@@ -482,42 +481,56 @@ poll:
         case KEY_ENTER:
         case '\r':
         case '\n':
-                run_live(&stat, name, quality[0], s_buf, sizeof s_buf);
+                if (info.len)
+                        run_live(info.name_offset[stat.cur], quality[0], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'S':
-                run_live(&stat, name, quality[1], s_buf, sizeof s_buf);
+                if (info.len)
+                        run_live(info.name_offset[stat.cur], quality[1], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'H':
-                run_live(&stat, name, quality[2], s_buf, sizeof s_buf);
+                if (info.len)
+                        run_live(info.name_offset[stat.cur], quality[2], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'L':
-                run_live(&stat, name, quality[3], s_buf, sizeof s_buf);
+                if (info.len)
+                        run_live(info.name_offset[stat.cur], quality[3], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'P':
-                run_live(&stat, name, quality[4], s_buf, sizeof s_buf);
+                if (info.len)
+                        run_live(info.name_offset[stat.cur], quality[4], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'W':
-                run_live(&stat, name, quality[5], s_buf, sizeof s_buf);
+                if (info.len)
+                        run_live(info.name_offset[stat.cur], quality[5], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'A':
-                run_live(&stat, name, quality[6], s_buf, sizeof s_buf);
+                if (info.len)
+                        run_live(info.name_offset[stat.cur], quality[6], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'C':
-                if (!stat.n_onl)
-                        goto poll;
-                snprintf(urlbuf, sizeof s_buf, "https://twitch.tv/%s", 
-                                name[stat.cur].s);
-                to_clipboard(urlbuf, s_buf, sizeof s_buf);
+                if (info.len) {
+                        snprintf(urlbuf, sizeof s_buf, "https://twitch.tv/%s", 
+                                        info.name_offset[stat.cur]);
+                        to_clipboard(urlbuf, s_buf, sizeof s_buf);
+                }
                 goto poll;
         case 'G':
-                if (!stat.n_onl)
-                        goto poll;
-                to_clipboard(gam[stat.cur].s, s_buf, sizeof s_buf);
+                if (info.len)
+                        to_clipboard(info.game_offset[stat.cur], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case 'T':
-                if (!stat.n_onl)
-                        goto poll;
-                to_clipboard(title[stat.cur].s, s_buf, sizeof s_buf);
+                if (info.len)
+                        to_clipboard(info.title_offset[stat.cur], 
+                                        s_buf, sizeof s_buf);
                 goto poll;
         case KEY_RESIZE:
                 stat.cur = 0;
@@ -525,26 +538,27 @@ poll:
                 getmaxyx(stdscr, stat.h, ch);
                 break;
         case KEY_MOUSE:
-                if(!(getmouse(&mevent) == OK))
-                        goto poll;
-                if(mevent.bstate & BUTTON1_PRESSED) {
-                        left_click(&stat, &mevent);
-                        break;
-                }
-                else {
-                        goto poll;
-                }
+                if(getmouse(&mevent) == OK && mevent.bstate & BUTTON1_PRESSED)
+                        left_click(&stat, info.len, &mevent);
         default:
                 goto poll;
         }
 
-        draw_all(&stat, name, gam, title);
+        draw_all(&stat, &info);
         goto poll;
 end:
-        free(ent);
-        free(name);
-        free(gam);
-        free(title);
+        if (ent.len) {
+                free(ent.data);
+                free(ent.offset);
+        }
+        if (info.len && info.name_data) {
+                free(info.name_data);
+                free(info.name_offset);
+                free(info.game_data);
+                free(info.game_offset);
+                free(info.title_data);
+                free(info.title_offset);
+        }
 
         curl_global_cleanup();
         endwin();
