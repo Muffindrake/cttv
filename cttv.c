@@ -540,6 +540,7 @@ poll:
         case KEY_MOUSE:
                 if(getmouse(&mevent) == OK && mevent.bstate & BUTTON1_PRESSED)
                         left_click(&stat, info.len, &mevent);
+                break;
         default:
                 goto poll;
         }
