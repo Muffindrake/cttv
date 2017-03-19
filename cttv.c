@@ -158,12 +158,18 @@ left_click(struct status *stat, size_t n_onl, MEVENT *mev)
 static void
 run_live(char *data, const char *q, char *s_buf, size_t sbsz)
 {
-        snprintf(s_buf, sbsz, "streamlink twitch.tv/%s %s "
-                        "> /dev/null 2> /dev/null &", 
+        snprintf(s_buf, sbsz, "nohup streamlink twitch.tv/%s %s "
+                        ">/dev/null 2>/dev/null &", 
                         data, 
                         q);
         system(s_buf);
-        usleep(1000);
+        snprintf(s_buf, sbsz, "nohup notify-send -u low -t 2000 "
+                        "\"streamlink twitch.tv/%s %s\" "
+                        ">/dev/null 2>/dev/null &",
+                        data,
+                        q);
+        system(s_buf);
+        usleep(500);
 }
 
 static void
@@ -171,7 +177,12 @@ to_clipboard(char *data, char *s_buf, size_t sbsz)
 {
         snprintf(s_buf, sbsz, "echo -n \"%s\" | xsel -psb", data);
         system(s_buf);
-        usleep(1000);
+        snprintf(s_buf, sbsz, "nohup notify-send -u low -t 2000 "
+                        "\'\"%s\" to clipboard\'"
+                        ">/dev/null 2>/dev/null &", 
+                        data);
+        system(s_buf);
+        usleep(500);
 }
 
 static void
