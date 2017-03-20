@@ -17,6 +17,8 @@ build:
 runtime:
         - https://github.com/streamlink/streamlink
         - xsel (for clipboard functionality)
+        - nohup
+        - notify-send (libnotify, for desktop notifications)
 
 usage: cttv [optional file]
         Q       die
