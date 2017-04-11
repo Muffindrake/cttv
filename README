@@ -13,12 +13,11 @@ build:
         - jansson
         - ncurses
         - libbsd
+        - libnotify
 
 runtime:
         - https://github.com/streamlink/streamlink
-        - xsel (for clipboard functionality)
         - nohup
-        - notify-send (libnotify, for desktop notifications)
 
 usage: cttv [optional file]
         Q       die
@@ -41,10 +40,6 @@ usage: cttv [optional file]
         W       worst
         A       audio
                 quality
-
-        C       https://twitch.tv/channel_name to clipboard
-        G       game to clipboard
-        T       title to clipboard
 
         default file is ~/.cttvrc
         one non-URL channel name per line
