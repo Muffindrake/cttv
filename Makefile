@@ -1,17 +1,16 @@
-CFLAGS := -Ofast -march=native
-DCFLAGS := -Ofast
-CFLAGS += `pkg-config jansson ncursesw libcurl libbsd --cflags`
-DCFLAGS += `pkg-config jansson ncursesw libcurl libbsd --cflags`
-LFLAGS := `pkg-config jansson ncursesw libcurl libbsd --libs`
+DCFLAGS := `pkg-config jansson ncursesw libcurl libbsd libnotify  --cflags` \
+	-std=c11 -Wall -Wextra -Wpedantic -Ofast
+CFLAGS := $(DCFLAGS) -march=native
+LFLAGS := `pkg-config jansson ncursesw libcurl libbsd libnotify  --libs`
 
 prefix ?= /usr/local
 
 all: cttv.c
-	$(CC) $(CFLAGS) -std=c11 -Wall -Wextra -o cttv cttv.c $(LFLAGS)
+	$(CC) $(CFLAGS) -o cttv cttv.c $(LFLAGS)
 	strip -s cttv
 
 dist: cttv.c
-	$(CC) $(DCFLAGS) -std=c11 -Wall -Wextra -o cttv cttv.c $(LFLAGS)
+	$(CC) $(DCFLAGS) -o cttv cttv.c $(LFLAGS)
 	strip -s cttv
 
 install: all

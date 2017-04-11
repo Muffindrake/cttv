@@ -8,10 +8,14 @@
 #include <curl/curl.h>
 #include <jansson.h>
 #include <ncurses.h>
+#include <libnotify/notify.h>
+#include <gobject/gobject.h>
 
 #define TTVAPI "https://api.twitch.tv/kraken/streams?channel=%s\
 &limit=100&stream_type=live&api_version=3\
 &client_id=onsyu6idu0o41dl4ixkofx6pqq7ghn"
+
+typedef NotifyNotification notify_m;
 
 const char *help = ""
 "Read the source file or https://github.com/muffindrake/cttv for help.\n";
@@ -54,7 +58,8 @@ struct status {
         unsigned int stat_only  :1;
 };
 
-static size_t
+static
+size_t
 mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
 {
         size_t rsize = size * nmemb;
@@ -71,7 +76,8 @@ mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
         return rsize;
 }
 
-static size_t
+static
+size_t
 get_lines(char *path, struct chan_ent *ent)
 {
         size_t n;
@@ -86,7 +92,7 @@ get_lines(char *path, struct chan_ent *ent)
                 n++;
         if (!n)
                 goto err;
-        
+
         ent->data = malloc((l = ftell(f)) + 1);
         rewind(f);
         ent->offset = malloc(n * sizeof(void *));
@@ -105,7 +111,8 @@ err:
         return n;
 }
 
-static void
+static
+void
 scroll_up(struct status *stat, size_t n_onl)
 {
         if (!stat->cur) {
@@ -120,7 +127,8 @@ scroll_up(struct status *stat, size_t n_onl)
                 stat->scry--;
 }
 
-static void
+static
+void
 scroll_down(struct status *stat, size_t n_onl)
 {
         if ((size_t) stat->cur == n_onl - 1) {
@@ -131,12 +139,13 @@ scroll_down(struct status *stat, size_t n_onl)
         }
 
         stat->cur++;
-        if (n_onl > (size_t) stat->h 
+        if (n_onl > (size_t) stat->h
                         && (size_t) stat->scry < n_onl - (size_t) stat->h)
                 stat->scry++;
 }
 
-static void
+static
+void
 left_click(struct status *stat, size_t n_onl, MEVENT *mev)
 {
         if ((size_t) mev->y > n_onl - 1)
@@ -155,43 +164,36 @@ left_click(struct status *stat, size_t n_onl, MEVENT *mev)
                 stat->scry = n_onl - stat->h;
 }
 
-static void
+static
+void
 run_live(char *data, const char *q, char *s_buf, size_t sbsz)
 {
-        snprintf(s_buf, sbsz, "nohup streamlink twitch.tv/%s %s "
-                        ">/dev/null 2>/dev/null &", 
-                        data, 
-                        q);
-        system(s_buf);
-        snprintf(s_buf, sbsz, "nohup notify-send -u low -t 2000 "
-                        "\"streamlink twitch.tv/%s %s\" "
+        static notify_m *notf;
+
+        snprintf(s_buf, sbsz, "nohup streamlink \'twitch.tv/%s\' %s "
                         ">/dev/null 2>/dev/null &",
                         data,
                         q);
         system(s_buf);
+        snprintf(s_buf, sbsz, "streamlink twitch.tv/%s %s", data, q);
+
+        notf = notify_notification_new(s_buf, 0, 0);
+        if (notf) {
+                notify_notification_set_timeout(notf, 2000);
+                notify_notification_show(notf, 0);
+                g_object_unref(notf);
+        }
         usleep(500);
 }
 
-static void
-to_clipboard(char *data, char *s_buf, size_t sbsz)
-{
-        snprintf(s_buf, sbsz, "echo -n \"%s\" | xsel -psb", data);
-        system(s_buf);
-        snprintf(s_buf, sbsz, "nohup notify-send -u low -t 2000 "
-                        "\'\"%s\" to clipboard\'"
-                        ">/dev/null 2>/dev/null &", 
-                        data);
-        system(s_buf);
-        usleep(500);
-}
-
-static void
-requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info, 
+static
+void
+requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                 char *s_buf, size_t sbsz, char *urlbuf, size_t ubsz)
-{       
+{
         static struct mem_data json_buf;
         static size_t i;
-        
+
         static CURL *crl;
         static CURLcode crlcode;
         static json_t *root;
@@ -202,10 +204,14 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
         static json_t *game;
         static json_t *status;
         static json_error_t error;
-        
+
         static size_t n_offs;
         static size_t g_offs;
         static size_t t_offs;
+
+        clear();
+        mvprintw(0, 0, "Obtaining information from API...");
+        refresh();
 
         stat->cur = 0;
         stat->scry = 0;
@@ -229,12 +235,12 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
 
         s_buf[0] = 0;
         for (i = 0, n_offs = 0; i < ent->len - 1; i++) {
-                n_offs += strlcat(s_buf + n_offs, ent->offset[i], 
-                                n_offs ? sbsz - (n_offs + 1) : sbsz); 
-                n_offs += strlcat(s_buf + n_offs, ",", 
+                n_offs += strlcat(s_buf + n_offs, ent->offset[i],
+                                n_offs ? sbsz - (n_offs + 1) : sbsz);
+                n_offs += strlcat(s_buf + n_offs, ",",
                                 n_offs ? sbsz - (n_offs + 1) : sbsz);
         }
-        strlcat(s_buf + n_offs, ent->offset[i], 
+        strlcat(s_buf + n_offs, ent->offset[i],
                         n_offs ? sbsz - (n_offs + 1) : sbsz);
 
         snprintf(urlbuf, ubsz, TTVAPI, s_buf);
@@ -245,11 +251,11 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
         crlcode = curl_easy_perform(crl);
         if (CURLE_OK != crlcode) {
                 endwin();
-                fprintf(stderr, "unable to perform GET request: %s\n", 
+                fprintf(stderr, "unable to perform GET request: %s\n",
                                 curl_easy_strerror(crlcode));
                 exit(1);
         }
-        
+
         root = json_loads(json_buf.p, 0, &error);
         if (!root) {
                 endwin();
@@ -257,7 +263,7 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                                 error.line, error.text);
                 exit(1);
         }
-        
+
         streams = json_object_get(root, "streams");
         if (!streams) {
                 endwin();
@@ -287,7 +293,7 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
         info->title_data = malloc(t_offs);
         info->name_offset = malloc(info->len * sizeof(void *));
         info->game_offset = malloc(info->len * sizeof(void *));
-        info->title_offset = malloc(info->len * sizeof(void *));        
+        info->title_offset = malloc(info->len * sizeof(void *));
 
         for (i = 0, n_offs = 0, g_offs = 0, t_offs = 0
                         ; i < info->len
@@ -317,7 +323,8 @@ cleanup:
         free(json_buf.p);
 }
 
-static void
+static
+void
 draw_def(struct status *stat, struct resp_ent *info)
 {
         static int i;
@@ -349,7 +356,8 @@ draw_def(struct status *stat, struct resp_ent *info)
         }
 }
 
-static void
+static
+void
 draw_stat(struct status *stat, struct resp_ent *info)
 {
         static int i;
@@ -371,19 +379,20 @@ draw_stat(struct status *stat, struct resp_ent *info)
 
                 if (stat->cur == i)
                         attroff(A_UNDERLINE);
-                
+
                 clrtobot();
         }
 }
 
-static void
+static
+void
 draw_all(struct status *stat, struct resp_ent *info)
 {
         clear();
 
         if (!info->len) {
-                mvprintw(0, 0, "no streams online or API dead\n"
-                                "hit R to refresh");
+                mvprintw(0, 0, "No streams online or API dead.\n"
+                                "Hit R to refresh.");
                 refresh();
                 return;
         }
@@ -404,7 +413,7 @@ main(int argc, char **argv)
                 fprintf(stderr, "Requires 1 argument, got %d\n", argc - 1);
                 return 1;
         }
-        
+
         static char s_buf[4096];
         static char urlbuf[4096];
         static struct status stat;
@@ -437,14 +446,12 @@ main(int argc, char **argv)
         noecho();
         curs_set(0);
         mousemask(BUTTON1_PRESSED, 0);
-        
+
+        notify_init("cttv");
         curl_global_init(CURL_GLOBAL_DEFAULT);
 
-        stat.stat_only = false;
-        memset(&info, 0, sizeof(struct resp_ent));
-
         getmaxyx(stdscr, stat.h, ch);
-        requests(&stat, &ent, &info, s_buf, sizeof s_buf, 
+        requests(&stat, &ent, &info, s_buf, sizeof s_buf,
                         urlbuf, sizeof urlbuf);
         draw_all(&stat, &info);
 poll:
@@ -483,7 +490,7 @@ poll:
                 break;
         case 'R':
                 getmaxyx(stdscr, stat.h, ch);
-                requests(&stat, &ent, &info, s_buf, sizeof s_buf, 
+                requests(&stat, &ent, &info, s_buf, sizeof s_buf,
                                 urlbuf, sizeof urlbuf);
                 break;
         case ' ':
@@ -493,54 +500,37 @@ poll:
         case '\r':
         case '\n':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[0], 
+                        run_live(info.name_offset[stat.cur], quality[0],
                                         s_buf, sizeof s_buf);
                 goto poll;
         case 'S':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[1], 
+                        run_live(info.name_offset[stat.cur], quality[1],
                                         s_buf, sizeof s_buf);
                 goto poll;
         case 'H':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[2], 
+                        run_live(info.name_offset[stat.cur], quality[2],
                                         s_buf, sizeof s_buf);
                 goto poll;
         case 'L':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[3], 
+                        run_live(info.name_offset[stat.cur], quality[3],
                                         s_buf, sizeof s_buf);
                 goto poll;
         case 'P':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[4], 
+                        run_live(info.name_offset[stat.cur], quality[4],
                                         s_buf, sizeof s_buf);
                 goto poll;
         case 'W':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[5], 
+                        run_live(info.name_offset[stat.cur], quality[5],
                                         s_buf, sizeof s_buf);
                 goto poll;
         case 'A':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[6], 
-                                        s_buf, sizeof s_buf);
-                goto poll;
-        case 'C':
-                if (info.len) {
-                        snprintf(urlbuf, sizeof s_buf, "https://twitch.tv/%s", 
-                                        info.name_offset[stat.cur]);
-                        to_clipboard(urlbuf, s_buf, sizeof s_buf);
-                }
-                goto poll;
-        case 'G':
-                if (info.len)
-                        to_clipboard(info.game_offset[stat.cur], 
-                                        s_buf, sizeof s_buf);
-                goto poll;
-        case 'T':
-                if (info.len)
-                        to_clipboard(info.title_offset[stat.cur], 
+                        run_live(info.name_offset[stat.cur], quality[6],
                                         s_buf, sizeof s_buf);
                 goto poll;
         case KEY_RESIZE:
@@ -572,6 +562,7 @@ end:
                 free(info.title_offset);
         }
 
+        notify_uninit();
         curl_global_cleanup();
         endwin();
 
