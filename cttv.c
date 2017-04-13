@@ -219,11 +219,6 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
 
         if (info->name_data) {
                 free(info->name_data);
-                free(info->name_offset);
-                free(info->game_data);
-                free(info->game_offset);
-                free(info->title_data);
-                free(info->title_offset);
                 memset(info, 0, sizeof(struct resp_ent));
         }
 
@@ -287,13 +282,14 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                 g_offs += json_string_length(json_object_get(ch, "game")) + 1;
                 t_offs += json_string_length(json_object_get(ch, "status")) + 1;
         }
-
-        info->name_data = malloc(n_offs);
-        info->game_data = malloc(g_offs);
-        info->title_data = malloc(t_offs);
-        info->name_offset = malloc(info->len * sizeof(void *));
-        info->game_offset = malloc(info->len * sizeof(void *));
-        info->title_offset = malloc(info->len * sizeof(void *));
+        
+        info->name_data = malloc(n_offs + g_offs + t_offs + 
+                        sizeof(void *) * 3 * info->len);
+        info->game_data = info->name_data + n_offs;
+        info->title_data = info->game_data + g_offs;
+        info->name_offset = (char **)(info->title_data + t_offs);
+        info->game_offset = info->name_offset + info->len;
+        info->title_offset = info->game_offset + info->len;
 
         for (i = 0, n_offs = 0, g_offs = 0, t_offs = 0
                         ; i < info->len
@@ -555,14 +551,8 @@ end:
                 free(ent.data);
                 free(ent.offset);
         }
-        if (info.len && info.name_data) {
+        if (info.len && info.name_data)
                 free(info.name_data);
-                free(info.name_offset);
-                free(info.game_data);
-                free(info.game_offset);
-                free(info.title_data);
-                free(info.title_offset);
-        }
 
         notify_uninit();
         curl_global_cleanup();
