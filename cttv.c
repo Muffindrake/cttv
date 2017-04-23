@@ -21,11 +21,11 @@ const char *help = ""
 "Read the source file or https://github.com/muffindrake/cttv for help.\n";
 
 const char *quality[] = {
-        "medium,source",
-        "source",
-        "high",
-        "low",
-        "mobile",
+        "medium,source,480p,best",
+        "source,best",
+        "high,720p60,720p",
+        "low,360p",
+        "mobile,144p",
         "worst",
         "audio"
 };
