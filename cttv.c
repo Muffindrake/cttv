@@ -23,9 +23,9 @@ const char *help = ""
 const char *quality[] = {
         "medium,source,480p,best",
         "source,best",
-        "high,720p60,720p",
-        "low,360p",
-        "mobile,144p",
+        "high,720p60,720p,best",
+        "low,360p,best",
+        "mobile,144p,best",
         "worst",
         "audio"
 };
@@ -93,9 +93,9 @@ get_lines(char *path, struct chan_ent *ent)
         if (!n)
                 goto err;
 
-        ent->data = malloc((l = ftell(f)) + 1);
+        ent->offset = malloc(n * sizeof(void *) + (l = ftell(f)) + 1);
         rewind(f);
-        ent->offset = malloc(n * sizeof(void *));
+        ent->data = (char *) &ent->offset[n];
 
         l = fread(ent->data, 1, l, f);
         ent->data[l - 1] = 0;
@@ -146,36 +146,43 @@ scroll_down(struct status *stat, size_t n_onl)
 
 static
 void
-left_click(struct status *stat, size_t n_onl, MEVENT *mev)
-{
-        if ((size_t) mev->y > n_onl - 1)
-                return;
-        if (n_onl < (size_t) stat->h) {
-                stat->cur = mev->y;
-                return;
-        }
-        stat->cur = stat->scry + mev->y;
-        if ((size_t) stat->cur > n_onl - 1)
-                stat->cur = n_onl - 1;
-        stat->scry = stat->cur - 1;
-        if (stat->scry < 0)
-                stat->scry = 0;
-        if ((size_t) stat->scry > n_onl - (size_t) stat->h)
-                stat->scry = n_onl - stat->h;
-}
-
-static
-void
-run_live(char *data, const char *q, char *s_buf, size_t sbsz)
+run_live(char *data, int c, char *s_buf, size_t sbsz)
 {
         static notify_m *notf;
+        static unsigned char q;
+        
+        switch (c) {
+                case KEY_ENTER:
+                case '\n':
+                case '\r':
+                        q = 0;
+                        break;
+                case 'S':
+                        q = 1;
+                        break;
+                case 'H':
+                        q = 2;
+                        break;
+                case 'L':
+                        q = 3;
+                        break;
+                case 'M':
+                        q = 4;
+                        break;
+                case 'W':
+                        q = 5;
+                        break;
+                case 'A':
+                        q = 6;
+                        break;
+        }
 
         snprintf(s_buf, sbsz, "nohup streamlink \'twitch.tv/%s\' %s "
                         ">/dev/null 2>/dev/null &",
                         data,
-                        q);
+                        quality[q]);
         system(s_buf);
-        snprintf(s_buf, sbsz, "streamlink twitch.tv/%s %s", data, q);
+        snprintf(s_buf, sbsz, "streamlink twitch.tv/%s %s", data, quality[q]);
 
         notf = notify_notification_new(s_buf, 0, 0);
         if (notf) {
@@ -417,7 +424,6 @@ main(int argc, char **argv)
         static struct resp_ent info;
         static int ch;
         static size_t i;
-        static MEVENT mevent;
 
         if (argc == 1) {
                 snprintf(s_buf, sizeof s_buf, "%s/.cttvrc", getenv("HOME"));
@@ -441,9 +447,8 @@ main(int argc, char **argv)
         keypad(stdscr, true);
         noecho();
         curs_set(0);
-        mousemask(BUTTON1_PRESSED, 0);
 
-        notify_init("cttv");
+        notify_init(argv[0]);
         curl_global_init(CURL_GLOBAL_DEFAULT);
 
         getmaxyx(stdscr, stat.h, ch);
@@ -495,50 +500,20 @@ poll:
         case KEY_ENTER:
         case '\r':
         case '\n':
-                if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[0],
-                                        s_buf, sizeof s_buf);
-                goto poll;
         case 'S':
-                if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[1],
-                                        s_buf, sizeof s_buf);
-                goto poll;
         case 'H':
-                if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[2],
-                                        s_buf, sizeof s_buf);
-                goto poll;
         case 'L':
-                if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[3],
-                                        s_buf, sizeof s_buf);
-                goto poll;
         case 'P':
-                if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[4],
-                                        s_buf, sizeof s_buf);
-                goto poll;
         case 'W':
-                if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[5],
-                                        s_buf, sizeof s_buf);
-                goto poll;
         case 'A':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], quality[6],
+                        run_live(info.name_offset[stat.cur], ch,
                                         s_buf, sizeof s_buf);
                 goto poll;
         case KEY_RESIZE:
                 stat.cur = 0;
                 stat.scry = 0;
                 getmaxyx(stdscr, stat.h, ch);
-                break;
-        case KEY_MOUSE:
-                if(getmouse(&mevent) == OK && mevent.bstate & BUTTON1_PRESSED)
-                        left_click(&stat, info.len, &mevent);
-                else
-                        goto poll;
                 break;
         default:
                 goto poll;
@@ -547,10 +522,8 @@ poll:
         draw_all(&stat, &info);
         goto poll;
 end:
-        if (ent.len) {
-                free(ent.data);
+        if (ent.len)
                 free(ent.offset);
-        }
         if (info.len && info.name_data)
                 free(info.name_data);
 
