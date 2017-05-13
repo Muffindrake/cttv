@@ -8,14 +8,10 @@
 #include <curl/curl.h>
 #include <jansson.h>
 #include <ncurses.h>
-#include <libnotify/notify.h>
-#include <gobject/gobject.h>
 
 #define TTVAPI "https://api.twitch.tv/kraken/streams?channel=%s\
 &limit=100&stream_type=live&api_version=3\
 &client_id=onsyu6idu0o41dl4ixkofx6pqq7ghn"
-
-typedef NotifyNotification notify_m;
 
 const char *help = ""
 "Read the source file or https://github.com/muffindrake/cttv for help.\n";
@@ -149,7 +145,6 @@ static
 void
 run_live(char *data, int c, char *s_buf, size_t sbsz)
 {
-        static notify_m *notf;
         static unsigned char q;
         
         switch (c) {
@@ -183,15 +178,10 @@ run_live(char *data, int c, char *s_buf, size_t sbsz)
                         data,
                         quality[q]);
         system(s_buf);
-        snprintf(s_buf, sbsz, "streamlink twitch.tv/%s %s", data, quality[q]);
-
-        notf = notify_notification_new(s_buf, 0, 0);
-        if (notf) {
-                notify_notification_set_timeout(notf, 2000);
-                notify_notification_show(notf, 0);
-                g_object_unref(notf);
-        }
-        usleep(500);
+        clear();
+        mvprintw(0, 0, "streamlink twitch.tv/%s %s", data, quality[q]);
+        refresh();
+        usleep(1000000);
 }
 
 static
@@ -451,7 +441,6 @@ main(int argc, char **argv)
         noecho();
         curs_set(0);
 
-        notify_init(argv[0]);
         curl_global_init(CURL_GLOBAL_DEFAULT);
 
         getmaxyx(stdscr, stat.h, ch);
@@ -512,7 +501,7 @@ poll:
                 if (info.len)
                         run_live(info.name_offset[stat.cur], ch,
                                         s_buf, sizeof s_buf);
-                goto poll;
+                break;
         case KEY_RESIZE:
                 stat.cur = 0;
                 stat.scry = 0;
@@ -530,7 +519,6 @@ end:
         if (info.len && info.name_data)
                 free(info.name_data);
 
-        notify_uninit();
         curl_global_cleanup();
         endwin();
 

@@ -2,7 +2,7 @@ cttv
 minimal twitch.tv terminal frontend for streamlink
 
 install:
-        git clone
+        git clone https://github.com/muffindrake/cttv
         cd cttv
         sudo make install
 
@@ -13,7 +13,6 @@ build:
         - jansson
         - ncurses
         - libbsd
-        - libnotify
 
 runtime:
         - https://github.com/streamlink/streamlink
@@ -27,7 +26,6 @@ usage: cttv [optional file]
         down/up
         j/k     
         J/K     
-        MOUSE1
         HOME
         END     alter selection
                 

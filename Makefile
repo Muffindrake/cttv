@@ -1,7 +1,7 @@
-DCFLAGS := `pkg-config jansson ncursesw libcurl libbsd libnotify  --cflags` \
-	-std=c11 -Wall -Wextra -Wpedantic -Ofast
-CFLAGS := $(DCFLAGS) -march=native
-LFLAGS := `pkg-config jansson ncursesw libcurl libbsd libnotify  --libs`
+DCFLAGS += `pkg-config jansson ncursesw libcurl libbsd --cflags` \
+	-std=c11 -Wall -Wextra -Wpedantic -O2
+CFLAGS += $(DCFLAGS) -march=native
+LFLAGS += `pkg-config jansson ncursesw libcurl libbsd --libs`
 
 prefix ?= /usr/local
 
