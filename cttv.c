@@ -56,6 +56,7 @@ struct status {
         int cur;
         int scry;
         unsigned int stat_only  :1;
+        unsigned int str_concat :1;
 };
 
 static
@@ -235,17 +236,19 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                 exit(1);
         }
 
-        s_buf[0] = 0;
-        for (i = 0, n_offs = 0; i < ent->len - 1; i++) {
-                n_offs += strlcat(s_buf + n_offs, ent->offset[i],
-                                n_offs ? sbsz - (n_offs + 1) : sbsz);
-                n_offs += strlcat(s_buf + n_offs, ",",
-                                n_offs ? sbsz - (n_offs + 1) : sbsz);
-        }
-        strlcat(s_buf + n_offs, ent->offset[i],
-                        n_offs ? sbsz - (n_offs + 1) : sbsz);
+        if (!stat->str_concat) {
+                for (s_buf[0] = 0, i = 0, n_offs = 0; i < ent->len - 1; i++) {
+                        n_offs += strlcat(s_buf + n_offs, ent->offset[i],
+                                        n_offs ? sbsz - (n_offs + 1) : sbsz);
+                        n_offs += strlcat(s_buf + n_offs, ",",
+                                        n_offs ? sbsz - (n_offs + 1) : sbsz);
+                }
 
-        snprintf(urlbuf, ubsz, TTVAPI, s_buf);
+                strlcat(s_buf + n_offs, ent->offset[i],
+                                n_offs ? sbsz - (n_offs + 1) : sbsz);
+                snprintf(urlbuf, ubsz, TTVAPI, s_buf);
+                stat->str_concat = 1;
+        }
 
         curl_easy_setopt(crl, CURLOPT_URL, urlbuf);
         curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, mem_write_callback);
