@@ -57,6 +57,58 @@ struct status {
 
 static
 size_t
+partition(struct resp_ent *rent, const size_t lo, size_t hi)
+{
+        static char *swp;
+        static size_t i;
+        static int res;
+
+        i = lo - 1;
+        hi++;
+
+        while (1) {
+                do {
+                        i++;
+                        res = strcmp(rent->name_offset[i], rent->name_offset[lo]);
+                }
+                while(res < 0);
+
+                do {
+                        hi--;
+                        res = strcmp(rent->name_offset[hi], rent->name_offset[lo]);
+                }
+                while(res > 0);
+
+                if (i >= hi)
+                        return hi;
+
+                swp = rent->name_offset[i];
+                rent->name_offset[i] = rent->name_offset[hi];
+                rent->name_offset[hi] = swp;
+                swp = rent->game_offset[i];
+                rent->game_offset[i] = rent->game_offset[hi];
+                rent->game_offset[hi] = swp;
+                swp = rent->title_offset[i];
+                rent->title_offset[i] = rent->title_offset[hi];
+                rent->title_offset[hi] = swp;
+        }
+}
+
+static
+void
+quicksort(struct resp_ent *rent, const size_t lo, const size_t hi)
+{
+        static size_t p;
+
+        if (lo < hi) {
+                p = partition(rent, lo, hi);
+                quicksort(rent, lo, p);
+                quicksort(rent, p + 1, hi);
+        }
+}
+
+static
+size_t
 mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
 {
         size_t rsize = size * nmemb;
@@ -75,7 +127,7 @@ mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
 
 static
 size_t
-get_lines(char *path, struct chan_ent *ent)
+get_lines(const char *path, struct chan_ent *ent)
 {
         size_t n;
         size_t i;
@@ -110,7 +162,7 @@ err:
 
 static
 void
-scroll_up(struct status *stat, size_t n_onl)
+scroll_up(struct status *stat, const size_t n_onl)
 {
         if (!stat->cur) {
                 stat->cur = n_onl - 1;
@@ -126,7 +178,7 @@ scroll_up(struct status *stat, size_t n_onl)
 
 static
 void
-scroll_down(struct status *stat, size_t n_onl)
+scroll_down(struct status *stat, const size_t n_onl)
 {
         if ((size_t) stat->cur == n_onl - 1) {
                 stat->cur = 0;
@@ -143,7 +195,7 @@ scroll_down(struct status *stat, size_t n_onl)
 
 static
 void
-run_live(char *data, int c, char *s_buf, size_t sbsz)
+run_live(const char *data, const int c, char *s_buf, const size_t sbsz)
 {
         static unsigned char q;
         
@@ -186,8 +238,8 @@ run_live(char *data, int c, char *s_buf, size_t sbsz)
 
 static
 void
-requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
-                char *s_buf, size_t sbsz, char *urlbuf, size_t ubsz)
+requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info, 
+                char *s_buf, const size_t sbsz, char *urlbuf, const size_t ubsz)
 {
         static struct mem_data json_buf;
         static size_t i;
@@ -313,6 +365,8 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                 t_offs += json_string_length(status) + 1;
         }
 
+        quicksort(info, 0, info->len - 1);
+
 cleanup:
         json_decref(root);
         curl_easy_cleanup(crl);
@@ -321,7 +375,7 @@ cleanup:
 
 static
 void
-draw_def(struct status *stat, struct resp_ent *info)
+draw_def(const struct status *stat, const struct resp_ent *info)
 {
         static int i;
         static int y;
@@ -354,7 +408,7 @@ draw_def(struct status *stat, struct resp_ent *info)
 
 static
 void
-draw_stat(struct status *stat, struct resp_ent *info)
+draw_stat(const struct status *stat, const struct resp_ent *info)
 {
         static int i;
         static int y;
