@@ -260,7 +260,7 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
         static size_t t_offs;
 
         clear();
-        mvprintw(0, 0, "Obtaining information from API...");
+        mvaddstr(0, 0, "Obtaining information from API...");
         refresh();
 
         stat->cur = 0;
@@ -274,7 +274,7 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
 
         if (!(crl = curl_easy_init())) {
                 endwin();
-                fprintf(stderr, "unable to initalize curl_easy\n");
+                fputs("unable to initalize curl_easy\n", stderr);
                 exit(1);
         }
 
@@ -314,7 +314,7 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
         streams = json_object_get(root, "streams");
         if (!streams) {
                 endwin();
-                fprintf(stderr, "unable to get streams object\n");
+                fputs("unable to get streams object\n", stderr);
                 exit(1);
         }
 
@@ -390,13 +390,14 @@ draw_def(const struct status *stat, const struct resp_ent *info)
                 if (stat->cur == i)
                         attron(A_UNDERLINE);
 
-                mvprintw(y, 0, "%s ", info->name_offset[i]);
+                mvaddstr(y, 0, info->name_offset[i]);
+                addstr(" ");
                 attron(A_STANDOUT);
-                printw("%s", info->game_offset[i]);
+                addstr(info->game_offset[i]);
                 attroff(A_STANDOUT);
-                printw(" ");
+                addstr(" ");
                 attron(A_BOLD);
-                printw("%s", info->title_offset[i]);
+                addstr(info->title_offset[i]);
                 attroff(A_BOLD);
 
                 if (stat->cur == i)
@@ -424,7 +425,7 @@ draw_stat(const struct status *stat, const struct resp_ent *info)
                         attron(A_UNDERLINE);
 
                 attron(A_BOLD);
-                mvprintw(y, 0, "%s", info->title_offset[i]);
+                mvaddstr(y, 0, info->title_offset[i]);
                 attroff(A_BOLD);
 
                 if (stat->cur == i)
@@ -441,7 +442,7 @@ draw_all(struct status *stat, struct resp_ent *info)
         clear();
 
         if (!info->len) {
-                mvprintw(0, 0, "No streams online or API dead.\n"
+                mvaddstr(0, 0, "No streams online or API dead.\n"
                                 "Hit R to refresh.");
                 refresh();
                 return;
@@ -475,16 +476,16 @@ main(int argc, char **argv)
         if (argc == 1) {
                 snprintf(s_buf, sizeof s_buf, "%s/.cttvrc", getenv("HOME"));
                 if (!(ent.len = get_lines(s_buf, &ent))) {
-                        fprintf(stderr, "unable to parse lines in file\n");
+                        fputs("unable to parse lines in file\n", stderr);
                         return 1;
                 }
         }
         else if (!strncmp(argv[1], "--help", 6)) {
-                printf("%s", help);
+                puts(help);
                 return 0;
         }
         else if (!(ent.len = get_lines(argv[1], &ent))) {
-                fprintf(stderr, "unable to parse lines in file\n");
+                fputs("unable to parse lines in file\n", stderr);
                 return 1;
         }
 
