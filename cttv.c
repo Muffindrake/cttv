@@ -127,7 +127,8 @@ mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
 
 static
 size_t
-get_lines(const char *path, struct chan_ent *ent)
+get_lines(const char *path, struct chan_ent *ent, char **s_buf, size_t *sbsz,
+                char **urlbuf, size_t *ubsz)
 {
         size_t n;
         size_t i;
@@ -142,7 +143,12 @@ get_lines(const char *path, struct chan_ent *ent)
         if (!n)
                 goto err;
 
-        ent->offset = malloc(n * sizeof(void *) + (l = ftell(f)) + 1);
+        *sbsz = (l = ftell(f)) + n + 1;
+        *s_buf = realloc(*s_buf, *sbsz);
+        *ubsz = *sbsz + strlen(TTVAPI) + 1;
+        *urlbuf = realloc(*urlbuf, *ubsz);
+
+        ent->offset = realloc(ent->offset, n * sizeof(void *) + l + 1);
         rewind(f);
         ent->data = (char *) &ent->offset[n];
 
@@ -265,11 +271,11 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
 
         stat->cur = 0;
         stat->scry = 0;
-        memset(&json_buf, 0, sizeof(struct mem_data));
+        memset(&json_buf, 0, sizeof json_buf);
 
         if (info->name_data) {
                 free(info->name_data);
-                memset(info, 0, sizeof(struct resp_ent));
+                memset(info, 0, sizeof *info);
         }
 
         if (!(crl = curl_easy_init())) {
@@ -465,17 +471,22 @@ main(int argc, char **argv)
                 return 1;
         }
 
-        static char s_buf[4096];
-        static char urlbuf[4096];
+        static char *s_buf;
+        static char *urlbuf;
         static struct status stat;
         static struct chan_ent ent;
         static struct resp_ent info;
         static int ch;
         static size_t i;
+        static size_t sbsz;
+        static size_t ubsz;
+
+        s_buf = malloc(sbsz = 1024);
 
         if (argc == 1) {
-                snprintf(s_buf, sizeof s_buf, "%s/.cttvrc", getenv("HOME"));
-                if (!(ent.len = get_lines(s_buf, &ent))) {
+                snprintf(s_buf, sbsz, "%s/.cttvrc", getenv("HOME"));
+                if (!(ent.len = get_lines(s_buf, &ent, &s_buf, &sbsz,
+                                                &urlbuf, &ubsz))) {
                         fputs("unable to parse lines in file\n", stderr);
                         return 1;
                 }
@@ -484,7 +495,8 @@ main(int argc, char **argv)
                 puts(help);
                 return 0;
         }
-        else if (!(ent.len = get_lines(argv[1], &ent))) {
+        else if (!(ent.len = get_lines(argv[1], &ent, &s_buf, &sbsz,
+                                        &urlbuf, &ubsz))) {
                 fputs("unable to parse lines in file\n", stderr);
                 return 1;
         }
@@ -499,8 +511,7 @@ main(int argc, char **argv)
         curl_global_init(CURL_GLOBAL_DEFAULT);
 
         getmaxyx(stdscr, stat.h, ch);
-        requests(&stat, &ent, &info, s_buf, sizeof s_buf,
-                        urlbuf, sizeof urlbuf);
+        requests(&stat, &ent, &info, s_buf, sbsz, urlbuf, ubsz);
         draw_all(&stat, &info);
 poll:
         ch = getch();
@@ -538,8 +549,7 @@ poll:
                 break;
         case 'R':
                 getmaxyx(stdscr, stat.h, ch);
-                requests(&stat, &ent, &info, s_buf, sizeof s_buf,
-                                urlbuf, sizeof urlbuf);
+                requests(&stat, &ent, &info, s_buf, sbsz, urlbuf, ubsz);
                 break;
         case ' ':
                 stat.stat_only = !stat.stat_only;
@@ -554,8 +564,7 @@ poll:
         case 'W':
         case 'A':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], ch,
-                                        s_buf, sizeof s_buf);
+                        run_live(info.name_offset[stat.cur], ch, s_buf, sbsz);
                 break;
         case KEY_RESIZE:
                 stat.cur = 0;
@@ -569,6 +578,8 @@ poll:
         draw_all(&stat, &info);
         goto poll;
 end:
+        free(s_buf);
+        free(urlbuf);
         if (ent.len)
                 free(ent.offset);
         if (info.len && info.name_data)
