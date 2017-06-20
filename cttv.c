@@ -206,29 +206,29 @@ run_live(const char *data, const int c, char *s_buf, const size_t sbsz)
         static unsigned char q;
         
         switch (c) {
-                case KEY_ENTER:
-                case '\n':
-                case '\r':
-                        q = 0;
-                        break;
-                case 'S':
-                        q = 1;
-                        break;
-                case 'H':
-                        q = 2;
-                        break;
-                case 'L':
-                        q = 3;
-                        break;
-                case 'M':
-                        q = 4;
-                        break;
-                case 'W':
-                        q = 5;
-                        break;
-                case 'A':
-                        q = 6;
-                        break;
+        case KEY_ENTER:
+        case '\n':
+        case '\r':
+                q = 0;
+                break;
+        case 'S':
+                q = 1;
+                break;
+        case 'H':
+                q = 2;
+                break;
+        case 'L':
+                q = 3;
+                break;
+        case 'M':
+                q = 4;
+                break;
+        case 'W':
+                q = 5;
+                break;
+        case 'A':
+                q = 6;
+                break;
         }
 
         snprintf(s_buf, sbsz, "nohup streamlink \'twitch.tv/%s\' %s "
