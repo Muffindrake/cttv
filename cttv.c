@@ -145,7 +145,7 @@ get_lines(const char *path, struct chan_ent *ent, char **s_buf, size_t *sbsz,
 
         *sbsz = (l = ftell(f)) + n + 1;
         *s_buf = realloc(*s_buf, *sbsz);
-        *ubsz = *sbsz + strlen(TTVAPI) + 1;
+        *ubsz = *sbsz + sizeof TTVAPI;
         *urlbuf = realloc(*urlbuf, *ubsz);
 
         ent->offset = realloc(ent->offset, n * sizeof(void *) + l + 1);
