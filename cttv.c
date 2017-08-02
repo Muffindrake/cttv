@@ -247,23 +247,21 @@ void
 requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info, 
                 char *s_buf, const size_t sbsz, char *urlbuf, const size_t ubsz)
 {
-        static struct mem_data json_buf;
-        static size_t i;
-
-        static CURL *crl;
-        static CURLcode crlcode;
-        static json_t *root;
-        static json_t *streams;
-        static json_t *element;
-        static json_t *ch;
-        static json_t *rname;
-        static json_t *game;
-        static json_t *status;
-        static json_error_t error;
-
-        static size_t n_offs;
-        static size_t g_offs;
-        static size_t t_offs;
+        struct mem_data json_buf;
+        size_t i;
+        size_t n_offs;
+        size_t g_offs;
+        size_t t_offs;
+        CURL *crl;
+        CURLcode crlcode;
+        json_t *root;
+        json_t *streams;
+        json_t *element;
+        json_t *ch;
+        json_t *rname;
+        json_t *game;
+        json_t *status;
+        json_error_t error;
 
         clear();
         mvaddstr(0, 0, "Obtaining information from API...");
@@ -383,8 +381,8 @@ static
 void
 draw_def(const struct status *stat, const struct resp_ent *info)
 {
-        static int i;
-        static int y;
+        int i;
+        int y;
 
         i = 0;
         y = -stat->scry;
@@ -417,8 +415,8 @@ static
 void
 draw_stat(const struct status *stat, const struct resp_ent *info)
 {
-        static int i;
-        static int y;
+        int i;
+        int y;
 
         i = 0;
         y = -stat->scry;
