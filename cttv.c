@@ -527,9 +527,9 @@ change_quality(struct status *stat, char *s_buf, size_t sbsz)
         int ret;
 
         clear();
-        attron(A_UNDERLINE);
+        attron(A_BOLD);
         addstr("Current format: ");
-        attroff(A_UNDERLINE);
+        attroff(A_BOLD);
         attron(A_STANDOUT);
         addstr(stat->q);
         attroff(A_STANDOUT);
@@ -540,9 +540,9 @@ change_quality(struct status *stat, char *s_buf, size_t sbsz)
                 addch('\n');
         }
 
-        attron(A_UNDERLINE);
+        attron(A_BOLD);
         addstr("Select a format by entering an integer: ");
-        attroff(A_UNDERLINE);
+        attroff(A_BOLD);
         refresh();
         echo();
         attron(A_BOLD);
@@ -579,9 +579,9 @@ change_quality(struct status *stat, char *s_buf, size_t sbsz)
         }
 
         stat->q = quality[x - 1];
-        attron(A_UNDERLINE);
+        attron(A_BOLD);
         addstr("Format chosen: ");
-        attroff(A_UNDERLINE);
+        attroff(A_BOLD);
         attron(A_REVERSE);
         addstr(stat->q);
         attroff(A_REVERSE);
