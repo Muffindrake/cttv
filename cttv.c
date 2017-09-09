@@ -540,6 +540,7 @@ change_quality(struct status *stat, char *s_buf, size_t sbsz)
                 addch('\n');
         }
 
+        addch('\n');
         attron(A_BOLD);
         addstr("Select a format by entering an integer: ");
         attroff(A_BOLD);
