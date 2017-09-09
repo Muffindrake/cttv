@@ -1,48 +1,51 @@
 cttv
-minimal twitch.tv terminal frontend for streamlink
+minimal twitch.tv terminal frontend
 
 install:
-        git clone https://github.com/muffindrake/cttv
-        cd cttv
-        sudo make install
+        $ git clone https://github.com/muffindrake/cttv
+        $ cd cttv
+        # su -c "make install"
 
 dependencies:
 build:
-        - C compiler
+        - C11-compliant compiler
         - libcurl
         - jansson
         - ncurses
         - libbsd
 
 runtime:
-        - https://github.com/streamlink/streamlink
+        - youtube-dl
         - nohup
+        - sh-compatible shell
 
-usage: cttv [optional file]
-        Q       die
-        Space   toggle default/title only display
-        R       refresh status
+usage: cttv [file]
+        Q               exit/quit
+
+        Space           toggle default/title only display
+
+        r               refresh status
+
+        R               reload file
+
+        #               set video format for youtube-dl
+                        (default is somewhat like earlier twitch "medium")
+
+        Backspace       run "youtube-dl -F" on channel URL and display
+                        video format options
+                        (you are expected to change the format options in the
+                        "quality" string array in the source to your liking.
+                        default video format can also be set there)
         
         down/up
         j/k     
         J/K     
         HOME
-        END     alter selection
-                
-                run stream with
-        Enter   medium,source
-        S       source
-        H       high
-        L       low
-        P       mobile
-        W       worst
-        A       audio
-                quality
+        END             alter selection
 
         default file is ~/.cttvrc
         one non-URL channel name per line
-        Unix line endings, utf8 and 100 or less lines are expected
-
+        Unix line endings and UTF-8 are expected
 
 license:
         see the LICENSE file

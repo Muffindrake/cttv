@@ -1,3 +1,5 @@
+#include <errno.h>
+#include <limits.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,21 +11,55 @@
 #include <jansson.h>
 #include <ncurses.h>
 
+#define ARRSZ(arr) (sizeof arr / sizeof *arr)
+
+#ifndef VPLAYER
+#       define VPLAYER "mpv"
+#endif
+
 #define TTVAPI "https://api.twitch.tv/kraken/streams?channel=%s\
 &limit=100&stream_type=live&api_version=3\
 &client_id=onsyu6idu0o41dl4ixkofx6pqq7ghn"
+#define HIT_ANY_KEY "Hit the any key to return."
 
 const char *help = ""
-"Read the source file or https://github.com/muffindrake/cttv for help.\n";
+"Read the source file or README for help.\n";
 
+#define DEFAULT_QUALITY_INDEX 4
 const char *quality[] = {
-        "medium,source,480p,best",
-        "source,best",
-        "high,720p60,720p,best",
-        "low,360p,best",
-        "mobile,144p,best",
+        "best",
+        "best[height <=? 1440]/best",
+        "best[height <=? 1080]/best",
+        "best[height <=? 720]/best",
+        "best[height <=? 720][tbr <=? 2500]/best",
+        "best[height <=? 480][tbr <=? 2250]/best",
+        "best[height <=? 360][tbr <=? 1750]/best",
+        "best[height <=? 480]/best",
+        "best[height <=? 360]/best",
+        "best[height <=? 160]/best",
         "worst",
-        "audio"
+        "audio",
+        "1440p60/best",
+        "1080p60/best",
+        "720p60/best",
+        "480p60/best",
+        "360p60/best",
+        "1440p30/best",
+        "1080p30/best",
+        "720p30/best",
+        "480p30/best",
+        "360p30/best",
+        "best[tbr <=? 6000]/best",
+        "best[tbr <=? 5000]/best",
+        "best[tbr <=? 4000]/best",
+        "best[tbr <=? 3500]/best",
+        "best[tbr <=? 3250]/best",
+        "best[tbr <=? 3000]/best",
+        "best[tbr <=? 2500]/best",
+        "best[tbr <=? 2000]/best",
+        "best[tbr <=? 1500]/best",
+        "best[tbr <=? 1000]/best",
+        "best[tbr <=? 500]/best"
 };
 
 struct mem_data {
@@ -48,14 +84,14 @@ struct resp_ent {
 };
 
 struct status {
+        const char *q;
+        char *vpl;
         int h;
         int cur;
         int scry;
         unsigned int stat_only  :1;
-        unsigned int str_concat :1;
 };
 
-static
 size_t
 partition(struct resp_ent *rent, const size_t lo, size_t hi)
 {
@@ -94,7 +130,6 @@ partition(struct resp_ent *rent, const size_t lo, size_t hi)
         }
 }
 
-static
 void
 quicksort(struct resp_ent *rent, const size_t lo, const size_t hi)
 {
@@ -107,7 +142,6 @@ quicksort(struct resp_ent *rent, const size_t lo, const size_t hi)
         }
 }
 
-static
 size_t
 mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
 {
@@ -125,12 +159,29 @@ mem_write_callback(void *cont, size_t size, size_t nmemb, void *p)
         return rsize;
 }
 
-static
+void
+update_url_str(const struct chan_ent *ent, char *s_buf, size_t sbsz,
+                char *urlbuf, size_t ubsz)
+{
+        size_t i;
+        size_t n_offs;
+
+        for (s_buf[0] = 0, i = 0, n_offs = 0; i < ent->len - 1; i++) {
+                n_offs += strlcat(s_buf + n_offs, ent->offset[i],
+                                n_offs ? sbsz - (n_offs + 1) : sbsz);
+                n_offs += strlcat(s_buf + n_offs, ",",
+                                n_offs ? sbsz - (n_offs + 1) : sbsz);
+        }
+
+        strlcat(s_buf + n_offs, ent->offset[i],
+                        n_offs ? sbsz - (n_offs + 1) : sbsz);
+        snprintf(urlbuf, ubsz, TTVAPI, s_buf);
+}
+
 size_t
 get_lines(const char *path, struct chan_ent *ent, char **s_buf, size_t *sbsz,
                 char **urlbuf, size_t *ubsz)
 {
-        size_t n;
         size_t i;
         size_t l;
 
@@ -138,35 +189,37 @@ get_lines(const char *path, struct chan_ent *ent, char **s_buf, size_t *sbsz,
         if (!f)
                 return 0;
 
-        for (n = 0; EOF != fscanf(f, "%*[^\n]") && EOF != fscanf(f, "%*c");)
-                n++;
-        if (!n)
+        ent->len = 0;
+        for (; EOF != fscanf(f, "%*[^\n]") && EOF != fscanf(f, "%*c");)
+                ent->len++;
+        if (!ent->len)
                 goto err;
 
-        *sbsz = (l = ftell(f)) + n + 1;
+        *sbsz = (l = ftell(f)) + ent->len + 1;
         *s_buf = realloc(*s_buf, *sbsz);
         *ubsz = *sbsz + sizeof TTVAPI;
         *urlbuf = realloc(*urlbuf, *ubsz);
 
-        ent->offset = realloc(ent->offset, n * sizeof(void *) + l + 1);
+        ent->offset = realloc(ent->offset, ent->len * sizeof(void *) + l + 1);
         rewind(f);
-        ent->data = (char *) &ent->offset[n];
+        ent->data = (char *) (ent->offset + ent->len);
 
         l = fread(ent->data, 1, l, f);
         ent->data[l - 1] = 0;
 
         ent->offset[0] = ent->data;
-        for (i = 1; i < n; i++) {
+        for (i = 1; i < ent->len; i++) {
                 ent->offset[i] = strchr(ent->offset[i - 1], '\n') + 1;
                 *(ent->offset[i] - 1) = 0;
         }
 
+        update_url_str(ent, *s_buf, *sbsz, *urlbuf, *ubsz);
+
 err:
         fclose(f);
-        return n;
+        return ent->len;
 }
 
-static
 void
 scroll_up(struct status *stat, const size_t n_onl)
 {
@@ -182,7 +235,6 @@ scroll_up(struct status *stat, const size_t n_onl)
                 stat->scry--;
 }
 
-static
 void
 scroll_down(struct status *stat, const size_t n_onl)
 {
@@ -199,53 +251,36 @@ scroll_down(struct status *stat, const size_t n_onl)
                 stat->scry++;
 }
 
-static
 void
-run_live(const char *data, const int c, char *s_buf, const size_t sbsz)
+run_live(const char *name, const char *q, const char *vpl,
+                char *s_buf, const size_t sbsz)
 {
-        static unsigned char q;
-        
-        switch (c) {
-        case KEY_ENTER:
-        case '\n':
-        case '\r':
-                q = 0;
-                break;
-        case 'S':
-                q = 1;
-                break;
-        case 'H':
-                q = 2;
-                break;
-        case 'L':
-                q = 3;
-                break;
-        case 'M':
-                q = 4;
-                break;
-        case 'W':
-                q = 5;
-                break;
-        case 'A':
-                q = 6;
-                break;
+        int ret;
+
+        snprintf(s_buf, sbsz, "nohup youtube-dl 'https://twitch.tv/%s' "
+                        "-f '%s' -o - | %s - "
+                        ">/dev/null 2>/dev/null &",
+                        name,
+                        q,
+                        vpl);
+        ret = system(s_buf);
+        if (ret) {
+                endwin();
+                fprintf(stderr, "Unable to launch shell: %s\n", s_buf);
+                exit(1);
         }
 
-        snprintf(s_buf, sbsz, "nohup streamlink \'twitch.tv/%s\' %s "
-                        ">/dev/null 2>/dev/null &",
-                        data,
-                        quality[q]);
-        system(s_buf);
         clear();
-        mvprintw(0, 0, "streamlink twitch.tv/%s %s", data, quality[q]);
+        printw("youtube-dl 'https://twitch.tv/%s' -f '%s' -o - | %s -",
+                        name,
+                        q,
+                        vpl);
         refresh();
         usleep(1000000);
 }
 
-static
 void
-requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info, 
-                char *s_buf, const size_t sbsz, char *urlbuf, const size_t ubsz)
+requests(struct status *stat, struct resp_ent *info, char *urlbuf)
 {
         struct mem_data json_buf;
         size_t i;
@@ -282,20 +317,6 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                 exit(1);
         }
 
-        if (!stat->str_concat) {
-                for (s_buf[0] = 0, i = 0, n_offs = 0; i < ent->len - 1; i++) {
-                        n_offs += strlcat(s_buf + n_offs, ent->offset[i],
-                                        n_offs ? sbsz - (n_offs + 1) : sbsz);
-                        n_offs += strlcat(s_buf + n_offs, ",",
-                                        n_offs ? sbsz - (n_offs + 1) : sbsz);
-                }
-
-                strlcat(s_buf + n_offs, ent->offset[i],
-                                n_offs ? sbsz - (n_offs + 1) : sbsz);
-                snprintf(urlbuf, ubsz, TTVAPI, s_buf);
-                stat->str_concat = 1;
-        }
-
         curl_easy_setopt(crl, CURLOPT_URL, urlbuf);
         curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, mem_write_callback);
         curl_easy_setopt(crl, CURLOPT_WRITEDATA, &json_buf);
@@ -322,11 +343,12 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                 exit(1);
         }
 
-        if (JSON_ARRAY != json_typeof(streams)) {
+        if (JSON_ARRAY != json_typeof(streams))
                 goto cleanup;
-        }
 
         info->len = json_array_size(streams);
+        if (!info->len)
+                goto cleanup;
 
         for (i = 0, n_offs = 0, g_offs = 0, t_offs = 0
                         ; i < info->len
@@ -369,7 +391,8 @@ requests(struct status *stat, struct chan_ent *ent, struct resp_ent *info,
                 t_offs += json_string_length(status) + 1;
         }
 
-        quicksort(info, 0, info->len - 1);
+        if (info->len > 1)
+                quicksort(info, 0, info->len - 1);
 
 cleanup:
         json_decref(root);
@@ -377,7 +400,6 @@ cleanup:
         free(json_buf.p);
 }
 
-static
 void
 draw_def(const struct status *stat, const struct resp_ent *info)
 {
@@ -411,7 +433,6 @@ draw_def(const struct status *stat, const struct resp_ent *info)
         }
 }
 
-static
 void
 draw_stat(const struct status *stat, const struct resp_ent *info)
 {
@@ -424,14 +445,12 @@ draw_stat(const struct status *stat, const struct resp_ent *info)
                         ; i++, y = i - stat->scry) {
                 if (y < 0)
                         continue;
-
                 if (stat->cur == i)
                         attron(A_UNDERLINE);
 
                 attron(A_BOLD);
                 mvaddstr(y, 0, info->title_offset[i]);
                 attroff(A_BOLD);
-
                 if (stat->cur == i)
                         attroff(A_UNDERLINE);
 
@@ -439,15 +458,15 @@ draw_stat(const struct status *stat, const struct resp_ent *info)
         }
 }
 
-static
 void
 draw_all(struct status *stat, struct resp_ent *info)
 {
         clear();
-
         if (!info->len) {
-                mvaddstr(0, 0, "No streams online or API dead.\n"
-                                "Hit R to refresh.");
+                addstr("No streams online or API dead.\n");
+                attron(A_BOLD);
+                addstr("Hit r to refresh. Hit R to reload file.");
+                attroff(A_BOLD);
                 refresh();
                 return;
         }
@@ -458,6 +477,118 @@ draw_all(struct status *stat, struct resp_ent *info)
                 draw_stat(stat, info);
 
         refresh();
+}
+
+void
+output_fmts(const char *name, char *s_buf, size_t sbsz)
+{
+        FILE *p;
+        int ret;
+
+        clear();
+        attron(A_BOLD);
+        addstr("Obtaining format information...\n\n");
+        attroff(A_BOLD);
+        snprintf(s_buf, sbsz,
+                        "youtube-dl -F 'https://twitch.tv/%s' -o - 2>&1",
+                        name);
+        attron(A_STANDOUT);
+        addstr(s_buf);
+        attroff(A_STANDOUT);
+        addch('\n');
+        refresh();
+        p = popen(s_buf, "re");
+        if (!p) {
+                endwin();
+                fprintf(stderr, "Unable to open pipe for command: %s\n",
+                                s_buf);
+                exit(1);
+        }
+
+        while (fgets(s_buf, sbsz, p))
+                addstr(s_buf);
+
+        ret = pclose(p);
+        if (ret)
+                printw("youtube-dl returned non-zero exit status %d", ret);
+
+        attron(A_BOLD);
+        addstr("\nEnd of format list. " HIT_ANY_KEY "\n");
+        attroff(A_BOLD);
+        refresh();
+        getch();
+}
+
+void
+change_quality(struct status *stat, char *s_buf, size_t sbsz)
+{
+        unsigned long long x;
+        size_t i;
+        int ret;
+
+        clear();
+        attron(A_UNDERLINE);
+        addstr("Current format: ");
+        attroff(A_UNDERLINE);
+        attron(A_STANDOUT);
+        addstr(stat->q);
+        attroff(A_STANDOUT);
+        addstr("\n\n");
+        for (i = 0; i < ARRSZ(quality); i++) {
+                printw("%02zu:", i + 1);
+                addstr(quality[i]);
+                addch('\n');
+        }
+
+        attron(A_UNDERLINE);
+        addstr("Select a format by entering an integer: ");
+        attroff(A_UNDERLINE);
+        refresh();
+        echo();
+        attron(A_BOLD);
+        ret = getnstr(s_buf, sbsz > INT_MAX ? INT_MAX : sbsz);
+        attroff(A_BOLD);
+        noecho();
+        addch('\n');
+        if (ret != OK) {
+                addstr("ncurses getnstr returned an error. " HIT_ANY_KEY);
+                refresh();
+                getch();
+                return;
+        }
+
+        errno = 0;
+        x = strtoull(s_buf, 0, 10);
+        if (errno == EINVAL) {
+                addstr("errno was set to EINVAL: invalid value. " HIT_ANY_KEY);
+                refresh();
+                getch();
+                return;
+        }
+        if (errno == ERANGE || x > ARRSZ(quality)) {
+                addstr("Conversion result out of range. " HIT_ANY_KEY);
+                refresh();
+                getch();
+                return;
+        }
+        if (!x) {
+                addstr("Invalid integer. " HIT_ANY_KEY);
+                refresh();
+                getch();
+                return;
+        }
+
+        stat->q = quality[x - 1];
+        attron(A_UNDERLINE);
+        addstr("Format chosen: ");
+        attroff(A_UNDERLINE);
+        attron(A_REVERSE);
+        addstr(stat->q);
+        attroff(A_REVERSE);
+        addstr("\n\n");
+        addstr(HIT_ANY_KEY);
+        refresh();
+        getch();
 }
 
 int
@@ -479,12 +610,15 @@ main(int argc, char **argv)
         static size_t sbsz;
         static size_t ubsz;
 
-        s_buf = malloc(sbsz = 1024);
+        stat.vpl = getenv("VPLAYER");
+        if (!stat.vpl)
+                stat.vpl = VPLAYER;
+        stat.q = quality[DEFAULT_QUALITY_INDEX];
+        s_buf = malloc(sbsz = 1 << 12);
 
         if (argc == 1) {
                 snprintf(s_buf, sbsz, "%s/.cttvrc", getenv("HOME"));
-                if (!(ent.len = get_lines(s_buf, &ent, &s_buf, &sbsz,
-                                                &urlbuf, &ubsz))) {
+                if (!get_lines(s_buf, &ent, &s_buf, &sbsz, &urlbuf, &ubsz)) {
                         fputs("unable to parse lines in file\n", stderr);
                         return 1;
                 }
@@ -493,8 +627,7 @@ main(int argc, char **argv)
                 puts(help);
                 return 0;
         }
-        else if (!(ent.len = get_lines(argv[1], &ent, &s_buf, &sbsz,
-                                        &urlbuf, &ubsz))) {
+        else if (!get_lines(argv[1], &ent, &s_buf, &sbsz, &urlbuf, &ubsz)) {
                 fputs("unable to parse lines in file\n", stderr);
                 return 1;
         }
@@ -509,7 +642,7 @@ main(int argc, char **argv)
         curl_global_init(CURL_GLOBAL_DEFAULT);
 
         getmaxyx(stdscr, stat.h, ch);
-        requests(&stat, &ent, &info, s_buf, sbsz, urlbuf, ubsz);
+        requests(&stat, &info, urlbuf);
         draw_all(&stat, &info);
 poll:
         ch = getch();
@@ -545,24 +678,43 @@ poll:
                         for (i = 0; i < 5; i++)
                                 scroll_down(&stat, info.len);
                 break;
-        case 'R':
+        case 'r':
                 getmaxyx(stdscr, stat.h, ch);
-                requests(&stat, &ent, &info, s_buf, sbsz, urlbuf, ubsz);
+                requests(&stat, &info, urlbuf);
+                break;
+        case 'R':
+                if (!ent.offset)
+                        break;
+                free(ent.offset);
+                ent.offset = 0;
+                snprintf(s_buf, sbsz, "%s/.cttvrc", getenv("HOME"));
+                if (!get_lines(argc == 1 ? s_buf : argv[1],
+                                        &ent,
+                                        &s_buf, &sbsz,
+                                        &urlbuf, &ubsz)) {
+                        endwin();
+                        fputs("unable to parse lines in file\n", stderr);
+                        return 1;
+                }
+
+                requests(&stat, &info, urlbuf);
                 break;
         case ' ':
                 stat.stat_only = !stat.stat_only;
                 break;
+        case '#':
+                change_quality(&stat, s_buf, sbsz);
+                break;
+        case KEY_BACKSPACE:
+                if (info.len)
+                        output_fmts(info.name_offset[stat.cur], s_buf, sbsz);
+                break;
         case KEY_ENTER:
         case '\r':
         case '\n':
-        case 'S':
-        case 'H':
-        case 'L':
-        case 'P':
-        case 'W':
-        case 'A':
                 if (info.len)
-                        run_live(info.name_offset[stat.cur], ch, s_buf, sbsz);
+                        run_live(info.name_offset[stat.cur], stat.q, stat.vpl,
+                                        s_buf, sbsz);
                 break;
         case KEY_RESIZE:
                 stat.cur = 0;
