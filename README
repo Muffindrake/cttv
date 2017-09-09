@@ -1,10 +1,27 @@
 cttv
 minimal twitch.tv terminal frontend
 
+This program is an attempt at a bare minimum frontend to twitch.tv, as said
+website requires huge amounts of Javascript to work _at_all_, slowing down any
+web browser you might be using to view the website. To do that, the program
+uses youtube-dl to pipe the stream into your favourite video player.
+Which is what should be used to play a video, rather than a text document
+viewer that went out of hand.
+
+You will need to configure a video player to use this program unless you use
+mpv which is default. This can be done by either editing the source code
+definition of the macro VPLAYER or setting an environment variable VPLAYER to
+said player. The video player must accept standard input by means of the hyphen
+character as an argument.
+
+The file read is just a plain text file with one channel name per line.
+Take care not to have any preceding or trailing whitespace.
+
 install:
         $ git clone https://github.com/muffindrake/cttv
         $ cd cttv
-        # su -c "make install"
+        $ make
+        $ su -c "make install"
 
 dependencies:
 build:
