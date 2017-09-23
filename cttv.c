@@ -558,31 +558,23 @@ change_quality(struct status *stat, char *s_buf, size_t sbsz)
         noecho();
         addch('\n');
         if (ret != OK) {
-                addstr("ncurses getnstr returned an error. " HIT_ANY_KEY);
-                refresh();
-                getch();
-                return;
+                addstr("ncurses getnstr returned an error. ");
+                goto hit_any_key;
         }
 
         errno = 0;
         x = strtoull(s_buf, 0, 10);
         if (errno == EINVAL) {
-                addstr("errno was set to EINVAL: invalid value. " HIT_ANY_KEY);
-                refresh();
-                getch();
-                return;
+                addstr("errno was set to EINVAL: invalid value. ");
+                goto hit_any_key;
         }
         if (errno == ERANGE || x > ARRSZ(quality)) {
-                addstr("Conversion result out of range. " HIT_ANY_KEY);
-                refresh();
-                getch();
-                return;
+                addstr("Conversion result out of range. ");
+                goto hit_any_key;
         }
         if (!x) {
-                addstr("Invalid integer. " HIT_ANY_KEY);
-                refresh();
-                getch();
-                return;
+                addstr("Invalid integer. ");
+                goto hit_any_key;
         }
 
         stat->q = quality[x - 1];
@@ -593,6 +585,7 @@ change_quality(struct status *stat, char *s_buf, size_t sbsz)
         addstr(stat->q);
         attroff(A_REVERSE);
         addstr("\n\n");
+hit_any_key:
         addstr(HIT_ANY_KEY);
         refresh();
         getch();
