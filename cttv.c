@@ -106,14 +106,12 @@ partition(struct resp_ent *rent, const size_t lo, size_t hi)
                 do {
                         i++;
                         res = strcmp(rent->name_offset[i], rent->name_offset[lo]);
-                }
-                while(res < 0);
+                } while (res < 0);
 
                 do {
                         hi--;
                         res = strcmp(rent->name_offset[hi], rent->name_offset[lo]);
-                }
-                while(res > 0);
+                } while (res > 0);
 
                 if (i >= hi)
                         return hi;
@@ -190,7 +188,7 @@ get_lines(const char *path, struct chan_ent *ent, char **s_buf, size_t *sbsz,
                 return 0;
 
         ent->len = 0;
-        for (; EOF != fscanf(f, "%*[^\n]") && EOF != fscanf(f, "%*c");)
+        while (EOF != fscanf(f, "%*[^\n]") && EOF != fscanf(f, "%*c"))
                 ent->len++;
         if (!ent->len)
                 goto err;
@@ -622,12 +620,10 @@ main(int argc, char **argv)
                         fputs("unable to parse lines in file\n", stderr);
                         return 1;
                 }
-        }
-        else if (!strncmp(argv[1], "--help", 6)) {
+        } else if (!strncmp(argv[1], "--help", 6)) {
                 puts(help);
                 return 0;
-        }
-        else if (!get_lines(argv[1], &ent, &s_buf, &sbsz, &urlbuf, &ubsz)) {
+        } else if (!get_lines(argv[1], &ent, &s_buf, &sbsz, &urlbuf, &ubsz)) {
                 fputs("unable to parse lines in file\n", stderr);
                 return 1;
         }

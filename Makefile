@@ -1,5 +1,6 @@
 CFLAGS := $(CFLAGS) `pkg-config jansson ncursesw libcurl libbsd --cflags` \
 	   -std=c11 -Wall -Wextra -Wpedantic
+LDFLAGS ?= -Wl,-O1 -Wl,--as-needed
 LDFLAGS := $(LDFLAGS) `pkg-config jansson ncursesw libcurl libbsd --libs`
 
 OPTLEVEL ?= -O3 -march=native
