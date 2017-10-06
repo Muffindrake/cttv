@@ -308,11 +308,11 @@ requests(struct status *stat, struct resp_ent *info, char *urlbuf)
 
         stat->cur = 0;
         stat->scry = 0;
-        memset(&json_buf, 0, sizeof json_buf);
+        json_buf = (struct mem_data) {0};
 
         if (info->name_data) {
                 free(info->name_data);
-                memset(info, 0, sizeof *info);
+                *info = (struct resp_ent) {0};
         }
 
         if (!(crl = curl_easy_init())) {
@@ -325,33 +325,17 @@ requests(struct status *stat, struct resp_ent *info, char *urlbuf)
         curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, mem_write_callback);
         curl_easy_setopt(crl, CURLOPT_WRITEDATA, &json_buf);
         crlcode = curl_easy_perform(crl);
-        if (CURLE_OK != crlcode) {
-                endwin();
-                fprintf(stderr, "unable to perform GET request: %s\n",
-                                curl_easy_strerror(crlcode));
-                exit(1);
-        }
-
-        root = json_loads(json_buf.p, 0, &error);
-        if (!root) {
-                endwin();
-                fprintf(stderr, "unable to decode JSON: line %d: %s\n",
-                                error.line, error.text);
-                exit(1);
-        }
-
-        streams = json_object_get(root, "streams");
-        if (!streams) {
-                endwin();
-                fputs("unable to get streams object\n", stderr);
-                exit(1);
-        }
-
-        if (JSON_ARRAY != json_typeof(streams))
+        if (CURLE_OK != crlcode)
                 goto cleanup;
 
-        info->len = json_array_size(streams);
-        if (!info->len)
+        root = json_loads(json_buf.p, 0, &error);
+        if (!root)
+                goto cleanup;
+
+        streams = json_object_get(root, "streams");
+        if (!streams
+                || JSON_ARRAY != json_typeof(streams)
+                || !(info->len = json_array_size(streams)))
                 goto cleanup;
 
         for (i = 0, n_offs = 0, g_offs = 0, t_offs = 0
@@ -401,7 +385,10 @@ requests(struct status *stat, struct resp_ent *info, char *urlbuf)
 cleanup:
         json_decref(root);
         curl_easy_cleanup(crl);
-        free(json_buf.p);
+        if (json_buf.p) {
+                free(json_buf.p);
+                json_buf.p = 0;
+        }
 }
 
 void
