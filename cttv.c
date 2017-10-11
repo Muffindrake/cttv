@@ -264,12 +264,19 @@ run_live(const char *name, const char *q, const char *vpl,
 {
         int ret;
 
-        snprintf(s_buf, sbsz,
-                        "nohup youtube-dl 'https://twitch.tv/%s' -f '%s' -o - "
-                        "| %s - >/dev/null 2>&1 &",
-                        name,
-                        q,
-                        vpl);
+        if (!strcmp("mpv", vpl))
+                snprintf(s_buf, sbsz,
+                                "nohup mpv 'https://twitch.tv/%s' "
+                                "--ytdl-format='%s' >/dev/null 2>&1 &",
+                                name,
+                                q);
+        else
+                snprintf(s_buf, sbsz,
+                                "nohup youtube-dl 'https://twitch.tv/%s' "
+                                "-f '%s' -o - | %s - >/dev/null 2>&1 &",
+                                name,
+                                q,
+                                vpl);
         ret = system(s_buf);
         if (ret) {
                 endwin();
