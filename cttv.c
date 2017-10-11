@@ -93,7 +93,7 @@ struct status {
 };
 
 size_t
-partition(struct resp_ent *rent, const size_t lo, size_t hi)
+partition(struct resp_ent *rent, size_t lo, size_t hi)
 {
         static char *swp;
         static size_t i;
@@ -129,7 +129,7 @@ partition(struct resp_ent *rent, const size_t lo, size_t hi)
 }
 
 void
-quicksort(struct resp_ent *rent, const size_t lo, const size_t hi)
+quicksort(struct resp_ent *rent, size_t lo, size_t hi)
 {
         static size_t p;
 
@@ -138,6 +138,15 @@ quicksort(struct resp_ent *rent, const size_t lo, const size_t hi)
                 quicksort(rent, lo, p);
                 quicksort(rent, p + 1, hi);
         }
+}
+
+void
+escape_squote(char *s)
+{
+        for (; *s; s++)
+                if (*s == '\'')
+                        *s = '_';
+
 }
 
 size_t
@@ -219,7 +228,7 @@ err:
 }
 
 void
-scroll_up(struct status *stat, const size_t n_onl)
+scroll_up(struct status *stat, size_t n_onl)
 {
         if (!stat->cur) {
                 stat->cur = n_onl - 1;
@@ -234,7 +243,7 @@ scroll_up(struct status *stat, const size_t n_onl)
 }
 
 void
-scroll_down(struct status *stat, const size_t n_onl)
+scroll_down(struct status *stat, size_t n_onl)
 {
         if ((size_t) stat->cur == n_onl - 1) {
                 stat->cur = 0;
@@ -251,25 +260,16 @@ scroll_down(struct status *stat, const size_t n_onl)
 
 void
 run_live(const char *name, const char *q, const char *vpl,
-                char *s_buf, const size_t sbsz)
+                char *s_buf, size_t sbsz)
 {
         int ret;
 
-        if (!strcmp("mpv", vpl))
-                snprintf(s_buf, sbsz,
-                                "nohup mpv 'https://twitch.tv/%s' "
-                                "--ytdl-format='%s' "
-                                ">/dev/null 2>&1 &",
-                                name,
-                                q);
-        else
-                snprintf(s_buf, sbsz,
-                                "nohup youtube-dl 'https://twitch.tv/%s' "
-                                "-f '%s' -o - | %s - "
-                                ">/dev/null 2>&1 &",
-                                name,
-                                q,
-                                vpl);
+        snprintf(s_buf, sbsz,
+                        "nohup youtube-dl 'https://twitch.tv/%s' -f '%s' -o - "
+                        "| %s - >/dev/null 2>&1 &",
+                        name,
+                        q,
+                        vpl);
         ret = system(s_buf);
         if (ret) {
                 endwin();
@@ -364,18 +364,19 @@ requests(struct status *stat, struct resp_ent *info, char *urlbuf)
                 ch = json_object_get(element, "channel");
 
                 rname = json_object_get(ch, "name");
-                strcpy(info->name_data + n_offs, json_string_value(rname));
                 info->name_offset[i] = info->name_data + n_offs;
+                strcpy(info->name_offset[i], json_string_value(rname));
+                escape_squote(info->name_offset[i]);
                 n_offs += json_string_length(rname) + 1;
 
                 game = json_object_get(ch, "game");
-                strcpy(info->game_data + g_offs, json_string_value(game));
                 info->game_offset[i] = info->game_data + g_offs;
+                strcpy(info->game_offset[i], json_string_value(game));
                 g_offs += json_string_length(game) + 1;
 
                 status = json_object_get(ch, "status");
-                strcpy(info->title_data + t_offs, json_string_value(status));
                 info->title_offset[i] = info->title_data + t_offs;
+                strcpy(info->title_offset[i], json_string_value(status));
                 t_offs += json_string_length(status) + 1;
         }
 
@@ -450,7 +451,7 @@ draw_stat(const struct status *stat, const struct resp_ent *info)
 }
 
 void
-draw_all(struct status *stat, struct resp_ent *info)
+draw_all(const struct status *stat, const struct resp_ent *info)
 {
         clear();
         if (!info->len) {
