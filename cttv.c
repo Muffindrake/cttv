@@ -393,10 +393,8 @@ requests(struct status *stat, struct resp_ent *info, char *urlbuf)
 cleanup:
         json_decref(root);
         curl_easy_cleanup(crl);
-        if (json_buf.p) {
+        if (json_buf.p)
                 free(json_buf.p);
-                json_buf.p = 0;
-        }
 }
 
 void
