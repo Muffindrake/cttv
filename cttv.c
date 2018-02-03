@@ -11,7 +11,7 @@
 #include <jansson.h>
 #include <ncurses.h>
 
-#define ARRSZ(arr) (sizeof arr / sizeof *arr)
+#define ARRSZ(arr) (sizeof (arr) / sizeof *(arr))
 
 #ifndef VPLAYER
 #       define VPLAYER "mpv"
@@ -207,7 +207,7 @@ get_lines(const char *path, struct chan_ent *ent, char **s_buf, size_t *sbsz,
         *ubsz = *sbsz + sizeof TTVAPI;
         *urlbuf = realloc(*urlbuf, *ubsz);
 
-        ent->offset = realloc(ent->offset, ent->len * sizeof(void *) + l + 1);
+        ent->offset = realloc(ent->offset, ent->len * sizeof (void *) + l + 1);
         rewind(f);
         ent->data = (char *) (ent->offset + ent->len);
 
@@ -355,9 +355,9 @@ requests(struct status *stat, struct resp_ent *info, char *urlbuf)
                 g_offs += json_string_length(json_object_get(ch, "game")) + 1;
                 t_offs += json_string_length(json_object_get(ch, "status")) + 1;
         }
-        
-        info->name_data = malloc(n_offs + g_offs + t_offs + 
-                        sizeof(void *) * 3 * info->len);
+
+        info->name_data = malloc(n_offs + g_offs + t_offs +
+                        sizeof (void *) * 3 * info->len);
         info->game_data = info->name_data + n_offs;
         info->title_data = info->game_data + g_offs;
         info->name_offset = (char **)(info->title_data + t_offs);
