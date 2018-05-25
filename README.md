@@ -2,7 +2,7 @@
 a terminal-based program for managing following streamers on different platforms
 
 ![preview](https://i.imgur.com/3tBvWp1.png)
-- bottom text: service[online count]{ytdl quality x of n chosen}(quality string)timestamp days:hoursminuteseconds
+- `bottom text: service[online count]{ytdl quality x of n chosen}(quality string)timestamp days:hoursminutesseconds`
 
 This is a program used for better managing of different streaming
 services to reduce the fatigue, memory usage and general inefficiency of having
