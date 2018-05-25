@@ -32,5 +32,6 @@ clean:
 DESTINATION = $(DESTDIR)$(PREFIX)
 install: all
 	install -m 0755 $(PROG) $(DESTINATION)/bin
+	bzip2 -c $(PROG).1 > $(DESTINATION)/share/man/man1/$(PROG).1.bz2
 
 -include $(DEPS)
