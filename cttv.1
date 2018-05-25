@@ -1,0 +1,63 @@
+.
+.TH CTTV 1 "" "" "multimedia"
+.SH NAME
+cttv - a program for managing following streamers on different platforms
+.
+.SH SYNOPSIS
+.nf
+\fBcttv\fP [--help]
+.fi
+.sp
+.SH DESCRIPTION
+\fBcttv\fP is a program used for better managing of different streaming
+services to reduce the fatigue (and memory usage) of having to browse multiple
+tabs in a web browser. It uses either youtube-dl or streamlink to play a stream
+in \fBmpv\fP.
+.sp
+It accepts no command line arguments and will print a help text together with
+a listing of available support for streaming services together with the names
+of the configuration files that have to be present in either
+\fB$XDG_CONFIG_HOME/cttv\fP or \fB$HOME/.config/cttv\fP, whichever variable is
+defined first checked in this order.
+.sp
+The configuration file format for channels is plain text, with one channel per
+line.
+.sp
+A special configuration file \fBq_ytdl\fP contains a list of quality options
+passed to \fByoutube\-dl\fP to set the quality of the watched stream.
+.sp
+Otherwise, general configuration options go into a file named \fBconfig\fP,
+which has to have a first line that contains the text \fB[general]\fP.
+It uses a plain \fBkey=value\fP format.
+.sp
+The options are as follows:
+.TP
+.B terminal
+set terminal emulator to use to run mpv under X11 (must support \fB\-x\fP)
+command line argument
+.TP
+.B refresh_timeout
+set time to wait in seconds before the program automatically updates the
+stream information; \-1 or 0 disables this behaviour (waits forever)
+.SH INTERACTIVE CONTROL
+.sp
+The default bindings are as follows:
+.TP
+.B Enter
+run a selected stream in a video player
+.TP
+.B Up, Down, k, j, Home, End
+alter stream selection
+.TP
+.B Page Up, Page Down
+cycle through user\-provided youtube\-dl qualities
+.TP
+.B Q, ^C
+Quit.
+.TP
+.B r
+perform a request to update live status of streams
+.SH COPYRIGHT
+MIT license
+.SH AUTHOR
+muffindrake@protonmail.ch

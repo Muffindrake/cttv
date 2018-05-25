@@ -1,17 +1,36 @@
-CFLAGS := $(CFLAGS) `pkg-config jansson ncursesw libcurl libbsd --cflags` \
-	   -std=c11 -Wall -Wextra -Wpedantic
-LDFLAGS ?= -Wl,-O1 -Wl,--as-needed
-LDFLAGS := $(LDFLAGS) `pkg-config jansson ncursesw libcurl libbsd --libs`
+.PHONY: all clean install
 
-OPTLEVEL ?= -O3 -march=native
-prefix ?= /usr/local
+LIBS += jansson ncursesw libcurl glib-2.0
+CFLAGS += -std=c11 -Wall -Wextra -Wpedantic
+CFLAGS += $(shell pkg-config $(LIBS) --cflags)
+LDFLAGS ?= -Wl,-O1 -Wl,-flto -Wl,--as-needed
+LDFLAGS += $(shell pkg-config $(LIBS) --libs)
 
-all: cttv.c
-	$(CC) $(CFLAGS) $(OPTLEVEL) -o cttv cttv.c $(LDFLAGS)
-	strip -s cttv
+PROG = cttv
+DIR_BUILD = build
+SRCS = $(wildcard *.c)
+OBJS = $(patsubst %.c,$(DIR_BUILD)/%.o,$(SRCS))
+DEPS = $(patsubst %.c,$(DIR_BUILD)/%.d,$(SRCS))
 
-install: all
-	install -m 0755 cttv $(prefix)/bin
+OPTLEVEL ?= -O3 -march=native -flto
+PREFIX ?= /usr/local
+
+$(info mkdir -p $(DIR_BUILD))
+$(shell mkdir -p $(DIR_BUILD))
+
+$(DIR_BUILD)/%.o: %.c
+	$(CC) $(OPTLEVEL) $(CFLAGS) $(OPTLEVEL) -o $@ -c -MMD $<
+
+$(PROG): $(OBJS)
+	$(CC) $(OPTLEVEL) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+
+all: $(PROG)
 
 clean:
-	$(RM) cttv
+	$(RM) $(PROG) $(OBJS) $(DEPS)
+
+DESTINATION = $(DESTDIR)$(PREFIX)
+install: all
+	install -m 0755 $(PROG) $(DESTINATION)/bin
+
+-include $(DEPS)
