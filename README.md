@@ -1,4 +1,4 @@
-#cttv
+# cttv
 a terminal-based program for managing following streamers on different platforms
 
 This is a program used for better managing of different streaming
@@ -8,7 +8,7 @@ It uses either youtube-dl or streamlink to play a stream in mpv.
 
 Refer to the manpage `cttv.1` for general usage instructions.
 
-#installation
+# installation
 
 ```
 $ git clone https://github.com/muffindrake/cttv
@@ -21,7 +21,7 @@ You may also want to execute the repo-provided shell script `placeconfigs.sh`
 as a regular user to have necessary configuration files, without which the
 program will not start, placed into the appropriate directories.
 
-#dependencies
+# dependencies
 - C11-compliant compiler
 - mpv
 - youtube-dl
@@ -34,5 +34,5 @@ The following libraries need to be present, runtime and development headers:
 - ncurses
 - glib-2.0
 
-#license
+# license
 see the LICENSE file
