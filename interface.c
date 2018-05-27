@@ -329,6 +329,7 @@ nc_loop_main(void)
         char timebuf[32];
         struct tm *time_last;
         time_t update_last;
+        size_t cur_old;
         int x_scroll_old;
         int ch;
 
@@ -347,8 +348,8 @@ redraw:
                         svc->status(svc));
         nc_pad_refresh(nc.svc + nc.cur_src);
 redraw_status:
-        nc_status_write("%s[%zu]:{%zu/%zu}(%s)%s%s", svc->name,
-                        svc->up_count(svc),
+        nc_status_write("%s[%zu/%zu]:{%zu/%zu}(%s)%s%s", svc->name,
+                        nc.svc[nc.cur_src].cur + 1, svc->up_count(svc),
                         nc.cur_quality + 1, quality_ytdl_arrsz(),
                         quality_ytdl_arr()[nc.cur_quality],
                         err ? err : "",
@@ -402,14 +403,20 @@ update:
         nc_scroll_reset(nc.svc + nc.cur_src);
         goto fetch;
 down:
+        cur_old = nc.svc[nc.cur_src].cur;
         nc_scroll_vert(nc.svc + nc.cur_src, 1);
         if (nc_term_undersize(nc.svc + nc.cur_src))
                 goto redraw;
+        if (cur_old != nc.svc[nc.cur_src].cur)
+                goto redraw_status;
         goto poll;
 up:
+        cur_old = nc.svc[nc.cur_src].cur;
         nc_scroll_vert(nc.svc + nc.cur_src, -1);
         if (nc_term_undersize(nc.svc + nc.cur_src))
                 goto redraw;
+        if (cur_old != nc.svc[nc.cur_src].cur)
+                goto redraw_status;
         goto poll;
 left:
         x_scroll_old = nc.svc[nc.cur_src].x_scroll;
@@ -424,18 +431,24 @@ right:
                 goto redraw;
         goto poll;
 home:
+        cur_old = nc.svc[nc.cur_src].cur;
         x_scroll_old = nc.svc[nc.cur_src].x_scroll;
         nc_scroll_reset(nc.svc + nc.cur_src);
         if (nc_term_undersize(nc.svc + nc.cur_src)
                 || x_scroll_old != nc.svc[nc.cur_src].x_scroll)
                 goto redraw;
+        if (cur_old != nc.svc[nc.cur_src].cur)
+                goto redraw_status;
         goto poll;
 end:
+        cur_old = nc.svc[nc.cur_src].cur;
         x_scroll_old = nc.svc[nc.cur_src].x_scroll;
         nc_scroll_reset_end(nc.svc + nc.cur_src);
         if (nc_term_undersize(nc.svc + nc.cur_src)
                 || x_scroll_old != nc.svc[nc.cur_src].x_scroll)
                 goto redraw;
+        if (cur_old != nc.svc[nc.cur_src].cur)
+                goto redraw_status;
         goto poll;
 quality_up:
         if (!quality_ytdl_arrsz())
