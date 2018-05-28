@@ -388,6 +388,8 @@ poll:
                 goto update;
         goto poll;
 run:
+        if (!nc.svc[nc.cur_src].n_entry)
+                goto poll;
         nc_status_write("%s: now playing %s/%s", svc->name, svc->name,
                         svc->chans(svc)[nc.svc[nc.cur_src].cur]);
         wrefresh(nc.status);
