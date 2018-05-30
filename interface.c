@@ -398,6 +398,8 @@ run:
         wtimeout(nc.status, 3000);
         ch = wgetch(nc.status);
         wtimeout(nc.status, -1);
+        if (ch == KEY_RESIZE)
+                goto resize;
         goto redraw_status;
 update:
         nc_status_write("%s: fetching data", svc->name);
