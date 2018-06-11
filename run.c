@@ -51,19 +51,25 @@ run_mpv_streamlink(const char *url, const char *q)
 char *
 quality_ytdl(const char *url)
 {
-        char *argv[2];
+        char *argv[4];
         char *data;
         bool ret;
 
-        argv[0] = printma("youtube-dl -F '%s' -o - 2>/dev/null "
-                        "| sed -e '/^\\[.*/d' -e '/^format code.*/d' "
+        argv[0] = "sh";
+        argv[1] = "-c";
+        argv[2] = printma("youtube-dl -F '%s' 2>/dev/null "
+                        "| sed "
+                        "-e '/^\\[.*/d' "
+                        "-e '/^format code.*/d' "
+                        "-e '/^ERROR.*/d' "
                         "| awk '{print $3, $4, $1}'", url);
-        if (!argv[0])
+        if (!argv[2])
                 return 0;
-        argv[1] = 0;
-        ret = g_spawn_sync(0, argv, 0, G_SPAWN_STDERR_TO_DEV_NULL, 0, 0, &data,
-                        0, 0, 0);
-        free(argv[0]);
+        argv[3] = 0;
+        ret = g_spawn_sync(0, argv, 0,
+                        G_SPAWN_STDERR_TO_DEV_NULL | G_SPAWN_SEARCH_PATH,
+                        0, 0, &data, 0, 0, 0);
+        free(argv[2]);
         if (!ret)
                 return 0;
         return data;
@@ -72,17 +78,20 @@ quality_ytdl(const char *url)
 char *
 quality_streamlink(const char *url)
 {
-        char *argv[2];
+        char *argv[4];
         char *data;
         bool ret;
 
-        argv[0] = printma("streamlink -Q '%s' | cut -f3- -d ' '", url);
-        if (!argv[0])
+        argv[0] = "sh";
+        argv[1] = "-c";
+        argv[2] = printma("streamlink -Q '%s' | cut -f3- -d ' '", url);
+        if (!argv[2])
                 return 0;
-        argv[1] = 0;
-        ret = g_spawn_sync(0, argv, 0, G_SPAWN_STDERR_TO_DEV_NULL, 0, 0, &data,
-                        0, 0, 0);
-        free(argv[0]);
+        argv[3] = 0;
+        ret = g_spawn_sync(0, argv, 0,
+                        G_SPAWN_STDERR_TO_DEV_NULL | G_SPAWN_SEARCH_PATH,
+                        0, 0, &data, 0, 0, 0);
+        free(argv[2]);
         if (!ret)
                 return 0;
         return data;

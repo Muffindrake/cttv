@@ -104,4 +104,5 @@ cfg_keyset(void)
         cfg.k_update = 'r';
         cfg.k_quality_change_up = KEY_PPAGE;
         cfg.k_quality_change_down = KEY_NPAGE;
+        cfg.k_quality_fetch = 'F';
 }

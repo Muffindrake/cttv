@@ -20,6 +20,7 @@ struct cfg_s {
         int k_update;
         int k_quality_change_up;
         int k_quality_change_down;
+        int k_quality_fetch;
 };
 
 extern struct cfg_s cfg;

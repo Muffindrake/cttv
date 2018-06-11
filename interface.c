@@ -96,6 +96,13 @@ svc_stream_play(struct svc *svc, size_t i, const char *q)
 }
 
 static inline
+char *
+svc_stream_quality(struct svc *svc, size_t i)
+{
+        return svc->stream_quality(svc, svc->chans(svc)[i]);
+}
+
+static inline
 void
 nc_pad_refresh(struct nc_svc *svc)
 {
@@ -325,6 +332,7 @@ void
 nc_loop_main(void)
 {
         const char *err;
+        char *s_qualitydata;
         struct svc *svc;
         char timebuf[32];
         struct tm *time_last;
@@ -380,6 +388,8 @@ poll:
                 goto quality_up;
         else if (ch == cfg.k_quality_change_down)
                 goto quality_down;
+        else if (ch == cfg.k_quality_fetch)
+                goto quality_fetch;
         else if (ch == cfg.k_quit)
                 goto ret;
         else if (ch == KEY_RESIZE)
@@ -390,7 +400,7 @@ poll:
 run:
         if (!nc.svc[nc.cur_src].n_entry)
                 goto poll;
-        nc_status_write("%s: now playing %s/%s", svc->name, svc->name,
+        nc_status_write("%s: now playing %s", svc->name,
                         svc->chans(svc)[nc.svc[nc.cur_src].cur]);
         wrefresh(nc.status);
         svc_stream_play(svc, nc.svc[nc.cur_src].cur,
@@ -470,6 +480,41 @@ quality_down:
         else
                 nc.cur_quality++;
         goto redraw_status;
+quality_fetch:
+        if (!nc.svc[nc.cur_src].n_entry)
+                goto poll;
+        curs_set(0);
+        nc_status_write("%s: fetching quality data for %s", svc->name,
+                        svc->chans(svc)[nc.svc[nc.cur_src].cur]);
+        wrefresh(nc.status);
+        s_qualitydata = svc_stream_quality(svc, nc.svc[nc.cur_src].cur);
+        if (!s_qualitydata) {
+                nc_status_write("%s: unable to fetch quality data for %s/%s",
+                                svc->name, svc->name,
+                                svc->chans(svc)[nc.svc[nc.cur_src].cur]);
+                wrefresh(nc.status);
+                wtimeout(nc.status, 3000);
+                ch = wgetch(nc.status);
+                wtimeout(nc.status, -1);
+                curs_set(1);
+                if (ch == KEY_RESIZE)
+                        goto resize;
+                goto poll;
+        }
+        nc_status_write("%s: available stream qualities for %s", svc->name,
+                        svc->chans(svc)[nc.svc[nc.cur_src].cur]);
+        wrefresh(nc.status);
+        wclear(nc.svc[nc.cur_src].pad);
+        mvwaddstr(nc.svc[nc.cur_src].pad, 0, 0, s_qualitydata);
+        free(s_qualitydata);
+        prefresh(nc.svc[nc.cur_src].pad, 0, 0, 0, 0, nc.h - 2, nc.w - 1);
+        refresh();
+        wtimeout(nc.status, -1);
+        ch = wgetch(nc.status);
+        curs_set(1);
+        if (ch == KEY_RESIZE)
+                goto resize;
+        goto redraw;
 ret:
         return;
 }
