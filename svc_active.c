@@ -34,18 +34,6 @@ svc_populate(void)
 
         if (svc_glob.act)
                 return;
-#if 0
-        svc_glob.n = SVCS_AMNT;
-        svc_glob.sz = SVCS_AMNT;
-        svc_glob.act = malloc(svc_glob.n * sizeof *svc_glob.act);
-        if (!svc_glob.act) {
-                HCF0(ERR_MEM);
-                exit(1);
-        }
-        memcpy(svc_glob.act, svcs, sizeof svcs);
-        for (i = 0; i < svc_glob.n; i++) if (svc_glob.act[i].local_update)
-                svc_glob.act[i].local_update(svc_glob.act + i);
-#endif
         svc_glob.n = 0;
         svc_glob.sz = ARRSZ(svcs);
         for (i = 0; i < ARRSZ(svcs); i++) {
