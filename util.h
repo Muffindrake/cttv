@@ -14,6 +14,7 @@
 #define NPE(s) ((s) ? (s) : "nullptr "#s)
 
 #define ERR_MEM "insufficient memory"
+#define ERR_CURL_INIT "unable to initialise libcurl"
 
 struct str_offs {
         char *data;
@@ -22,12 +23,19 @@ struct str_offs {
         size_t offs_len;
 };
 
+struct curl_cb_data {
+        char *p;
+        size_t len;
+};
+
 char *printma(const char *, ...);
 char *xstrdup(const char *);
 bool sys_session_graphical(void);
 void local_readfile(const char *, struct str_offs *);
+char *ftos(const char *);
 void local_free(struct str_offs *);
 void murderize_single_quotes(char *);
+size_t curl_callback_mem_write(void *, size_t, size_t, void *);
 char *request_single_sync(const char *, const char **);
 
 #endif

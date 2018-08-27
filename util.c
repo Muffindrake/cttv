@@ -91,6 +91,43 @@ ret:
         fclose(f);
 }
 
+char *
+ftos(const char *path)
+{
+        FILE *f;
+        char *ret;
+        size_t sz;
+        size_t read_count;
+        long pos;
+
+        f = fopen(path, "r");
+        if (!f)
+                return 0;
+        fseek(f, 0, SEEK_END);
+        pos = ftell(f);
+        if (pos < 0) {
+                fclose(f);
+                return 0;
+        }
+        if ((unsigned long long) pos > (unsigned long long) SIZE_MAX)
+                sz = SIZE_MAX;
+        else
+                sz = pos;
+        rewind(f);
+        ret = malloc(sz + 1);
+        if (!ret)
+                return 0;
+        read_count = fread(ret, 1, sz, f);
+        if (read_count != sz) {
+                free(ret);
+                fclose(f);
+                return 0;
+        }
+        ret[sz] = 0;
+        fclose(f);
+        return ret;
+}
+
 void
 local_free(struct str_offs *loc)
 {
@@ -105,16 +142,10 @@ murderize_single_quotes(char *s)
                 *s = '_';
 }
 
-struct cb_data {
-        char *p;
-        size_t len;
-};
-
-static
 size_t
-callback_mem_write(void *data_p, size_t sz, size_t n, void *user_p)
+curl_callback_mem_write(void *data_p, size_t sz, size_t n, void *user_p)
 {
-        struct cb_data *data = user_p;
+        struct curl_cb_data *data = user_p;
         size_t rsz = sz * n;
 
         data->p = realloc(data->p, data->len + rsz + 1);
@@ -126,16 +157,14 @@ callback_mem_write(void *data_p, size_t sz, size_t n, void *user_p)
         return rsz;
 }
 
-#define ERR_CURL_INIT "unable to initialise libcurl"
-
 char *
 request_single_sync(const char *url, const char **err)
 {
-        struct cb_data buf_ret;
+        struct curl_cb_data buf_ret;
         CURL *crl;
         CURLcode crlcode;
 
-        buf_ret = (struct cb_data) {0};
+        buf_ret = (struct curl_cb_data) {0};
         crl = curl_easy_init();
         if (!crl) {
                 if (err)
@@ -143,7 +172,7 @@ request_single_sync(const char *url, const char **err)
                 return 0;
         }
         curl_easy_setopt(crl, CURLOPT_URL, url);
-        curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, callback_mem_write);
+        curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, curl_callback_mem_write);
         curl_easy_setopt(crl, CURLOPT_WRITEDATA, &buf_ret);
         crlcode = curl_easy_perform(crl);
         curl_easy_cleanup(crl);

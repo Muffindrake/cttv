@@ -352,8 +352,10 @@ resize:
         clear();
         nc_resize(nc.svc + nc.cur_src);
 redraw:
-        nc_pad_draw(nc.svc + nc.cur_src, svc->chans(svc), svc->game(svc), 0,
-                        svc->status(svc));
+        nc_pad_draw(nc.svc + nc.cur_src, svc->chans(svc),
+                        svc->game ? svc->game(svc) : 0,
+                        svc->extra ? svc->extra(svc) : 0,
+                        svc->status ? svc->status(svc) : 0);
         nc_pad_refresh(nc.svc + nc.cur_src);
 redraw_status:
         nc_status_write("%s[%zu/%zu]:{%zu/%zu}(%s)%s%s", svc->name,
@@ -392,6 +394,10 @@ poll:
                 goto quality_fetch;
         else if (ch == cfg.k_quit)
                 goto ret;
+        else if (ch == cfg.k_svc_change_prev)
+                goto svc_change_prev;
+        else if (ch == cfg.k_svc_change_next)
+                goto svc_change_next;
         else if (ch == KEY_RESIZE)
                 goto resize;
         else if (ch == ERR)
@@ -481,7 +487,7 @@ quality_down:
                 nc.cur_quality++;
         goto redraw_status;
 quality_fetch:
-        if (!nc.svc[nc.cur_src].n_entry)
+        if (!nc.svc[nc.cur_src].n_entry || !svc->stream_quality)
                 goto poll;
         curs_set(0);
         nc_status_write("%s: fetching quality data for %s", svc->name,
@@ -515,6 +521,26 @@ quality_fetch:
         if (ch == KEY_RESIZE)
                 goto resize;
         goto redraw;
+svc_change_prev:
+        if (!nc.n_svc || nc.n_svc == 1)
+                goto poll;
+        if (!nc.cur_src)
+                nc.cur_src = nc.n_svc - 1;
+        else
+                nc.cur_src--;
+        nc_status_write("changing service to %s", svc_arr()[nc.cur_src].name);
+        wrefresh(nc.status);
+        goto fetch;
+svc_change_next:
+        if (!nc.n_svc || nc.n_svc == 1)
+                goto poll;
+        if (nc.cur_src == nc.n_svc - 1)
+                nc.cur_src = 0;
+        else
+                nc.cur_src++;
+        nc_status_write("changing service to %s", svc_arr()[nc.cur_src].name);
+        wrefresh(nc.status);
+        goto fetch;
 ret:
         return;
 }

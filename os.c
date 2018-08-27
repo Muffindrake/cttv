@@ -10,3 +10,9 @@ os_chdir(const char *p)
 {
         return !chdir(p);
 }
+
+bool
+fexists(const char *p)
+{
+        return !access(p, F_OK);
+}

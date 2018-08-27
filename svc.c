@@ -1,5 +1,6 @@
 #include "svc.h"
 #include "svc_twitch.h"
+#include "svc_picarto.h"
 
 struct svc svcs[SVCS_AMNT] = {
 [SVCS_TWITCH] = {
@@ -17,6 +18,20 @@ struct svc svcs[SVCS_AMNT] = {
         .chans          = ttv_chans,
         .status         = ttv_status,
         .game           = ttv_game
+},
+[SVCS_PICARTO] = {
+        .name           = "Picarto.TV",
+        .shrtname       = "PTV",
+        .cfg_suf        = "picarto",
+        .api_key        = "",
+        .ext_tool       = EXT_TOOL_STREAMLINK,
+        .local_update   = ptv_local_update,
+        .perform        = ptv_perform,
+        .stream_play    = ptv_stream_play,
+        .cleanup        = ptv_cleanup,
+        .up_count       = ptv_up_count,
+        .total_count    = ptv_total_count,
+        .chans          = ptv_chans
 }
 };
 

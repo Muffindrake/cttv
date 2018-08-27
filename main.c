@@ -37,8 +37,7 @@ main(int argc, char **argv)
         nc_loop_main();
         nc_end();
         curl_global_cleanup();
-        free(cfg.x11_term);
-        free(cfg.cfg_home);
+        cfg_free();
         quality_ytdl_free();
         svc_free();
         return 0;

@@ -21,6 +21,8 @@ struct cfg_s {
         int k_quality_change_up;
         int k_quality_change_down;
         int k_quality_fetch;
+        int k_svc_change_prev;
+        int k_svc_change_next;
 };
 
 extern struct cfg_s cfg;
@@ -28,5 +30,6 @@ extern struct cfg_s cfg;
 void cfg_homeset(void);
 void cfg_parse(void);
 void cfg_keyset(void);
+void cfg_free(void);
 
 #endif

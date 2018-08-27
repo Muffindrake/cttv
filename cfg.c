@@ -38,7 +38,10 @@ cfg_homeset(void)
         exit(1);
 }
 
+#define CFG "config"
 #define CFG_GROUP "general"
+#define CFG_GROUP_TERMINAL "terminal"
+#define CFG_GROUP_TIMEOUT "refresh_timeout"
 
 void
 cfg_parse(void)
@@ -53,18 +56,18 @@ cfg_parse(void)
                 HCF0(ERR_MEM);
                 exit(1);
         }
-        if (!g_key_file_load_from_file(cfgf, "config", G_KEY_FILE_NONE, &err)) {
+        if (!g_key_file_load_from_file(cfgf, CFG, G_KEY_FILE_NONE, &err)) {
                 HCF("unable to read default configuration file: %s",
                                 err->message);
                 exit(1);
         }
-        val = g_key_file_get_string(cfgf, CFG_GROUP, "terminal", &err);
+        val = g_key_file_get_string(cfgf, CFG_GROUP, CFG_GROUP_TERMINAL, &err);
         if (!val) {
                 HCF("unable to retrieve string from config: %s", err->message);
                 exit(1);
         }
         cfg.refresh_timeout = g_key_file_get_integer(cfgf, CFG_GROUP,
-                        "refresh_timeout", &err);
+                        CFG_GROUP_TIMEOUT, &err);
         if (err) {
                 HCF("unable to read refresh timeout from config: %s",
                                 err->message);
@@ -105,4 +108,13 @@ cfg_keyset(void)
         cfg.k_quality_change_up = KEY_PPAGE;
         cfg.k_quality_change_down = KEY_NPAGE;
         cfg.k_quality_fetch = 'F';
+        cfg.k_svc_change_prev = '-';
+        cfg.k_svc_change_next = '+';
+}
+
+void
+cfg_free(void)
+{
+        free(cfg.x11_term);
+        free(cfg.cfg_home);
 }

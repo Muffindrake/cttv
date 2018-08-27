@@ -27,6 +27,7 @@ struct svc {
 
 enum {
         SVCS_TWITCH,
+        SVCS_PICARTO,
         SVCS_AMNT
 };
 

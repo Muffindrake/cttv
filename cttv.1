@@ -20,8 +20,9 @@ of the configuration files that have to be present in either
 \fB$XDG_CONFIG_HOME/cttv\fP or \fB$HOME/.config/cttv\fP, whichever variable is
 defined first checked in this order.
 .sp
-The configuration file format for channels is plain text, with one channel per
-line.
+The configuration file format for channels is plain text, with contents
+depending on the actual streaming service. See below. Absence of a specific file
+means that service is assumed to be "unused" by the user.
 .sp
 A special configuration file \fBq_ytdl\fP contains a list of quality options
 passed to \fByoutube\-dl\fP to set the quality of the watched stream.
@@ -38,7 +39,8 @@ command line argument
 .TP
 .B refresh_timeout
 set time to wait in seconds before the program automatically updates the
-stream information; \-1 or 0 disables this behaviour (waits forever)
+stream information; \-1 or 0 disables this behaviour (waits forever), while the
+minimum time is bounded to 5 minutes otherwise
 .SH INTERACTIVE CONTROL
 .sp
 The default bindings are as follows:
@@ -52,11 +54,31 @@ alter stream selection
 .B Page Up, Page Down
 cycle through user\-provided youtube\-dl qualities
 .TP
+.B -, +
+cycle through streaming services
+.TP
+.B F
+retrieve codec information through youtube\-dl, if the given service is
+supported by the tool in that manner
+.TP
 .B Q, ^C
 Quit.
 .TP
 .B r
 perform a request to update live status of streams
+.SH FILE CONTENTS BY SERVICE
+.sp
+Generally, the files must not have trailing/preceding whitespace, as none of
+that is trimmed by the program.
+.TP
+.B Twitch.tv
+one channel name per line
+.TP
+.B Picarto.TV
+A single line containing a persistent access token that has privileges to access
+your account, as your following list is considered sensitive information by this
+service (and there is no good way to obtain a list of online streams via a
+list otherwise) See \fBhttps://oauth.picarto.tv/\fP
 .SH COPYRIGHT
 MIT license
 .SH AUTHOR

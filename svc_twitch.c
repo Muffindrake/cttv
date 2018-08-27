@@ -6,7 +6,6 @@
 #include <glib.h>
 #include <jansson.h>
 
-#include "paths.h"
 #include "run.h"
 #include "svc.h"
 #include "svc_twitch.h"
@@ -154,10 +153,8 @@ ttv_json_parse(struct svc *svc, const char *json)
                 err = ERR_JSON_ARRAY;
                 goto cleanup;
         }
-        if (!(ttv->up_cnt = json_array_size(streams))) {
-                err = 0;
+        if (!(ttv->up_cnt = json_array_size(streams)))
                 goto cleanup;
-        }
         offs_name = 0;
         offs_game = 0;
         offs_status = 0;
@@ -173,19 +170,19 @@ ttv_json_parse(struct svc *svc, const char *json)
                         goto cleanup;
                 }
                 chan_name = json_object_get(chan, "name");
-                if (!chan_name) {
+                if (!chan_name || json_typeof(chan_name) != JSON_STRING) {
                         err = ERR_JSON_NOCHANNAME;
                         goto cleanup;
                 }
                 offs_name += json_string_length(chan_name) + 1;
                 chan_game = json_object_get(chan, "game");
-                if (!chan_game) {
+                if (!chan_game || json_typeof(chan_game) != JSON_STRING) {
                         err = ERR_JSON_NOCHANGAME;
                         goto cleanup;
                 }
                 offs_game += json_string_length(chan_game) + 1;
                 chan_status = json_object_get(chan, "status");
-                if (!chan_status) {
+                if (!chan_status || json_typeof(chan_status) != JSON_STRING) {
                         err = ERR_JSON_NOCHANSTATUS;
                         goto cleanup;
                 }
