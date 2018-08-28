@@ -115,8 +115,10 @@ ftos(const char *path)
                 sz = pos;
         rewind(f);
         ret = malloc(sz + 1);
-        if (!ret)
+        if (!ret) {
+                fclose(f);
                 return 0;
+        }
         read_count = fread(ret, 1, sz, f);
         if (read_count != sz) {
                 free(ret);
