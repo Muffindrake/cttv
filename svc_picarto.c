@@ -126,7 +126,7 @@ ptv_json_parse(struct svc *svc, const char *json)
         if (!(ptv->up_cnt = i))
                 goto cleanup;
         ptv->data_name = malloc(offs_name + offs_name % sizeof (void *)
-                        + sizeof (void *) * 3 * ptv->up_cnt);
+                        + sizeof (void *) * ptv->up_cnt);
         ptv->offs_name = (char **)(ptv->data_name + offs_name
                         + offs_name % sizeof (void *));
         offs_name = 0;
