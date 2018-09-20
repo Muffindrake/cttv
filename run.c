@@ -15,8 +15,9 @@ run_mpv_ytdl(const char *url, const char *q)
         char *cmd;
 
         if (sys_session_graphical())
-                cmd = printma("nohup %s -x \"mpv '%s' --ytdl-format='%s'\" "
-                                ">/dev/null 2>&1 &", cfg.x11_term, url, q);
+                cmd = printma("nohup %s -e sh -c \"mpv '%s'"
+                                " --ytdl-format='%s'\" >/dev/null 2>&1 &",
+                                cfg.x11_term, url, q);
         else
                 cmd = printma("mpv '%s' --ytdl-format='%s'", url, q);
         if (!cmd)
@@ -35,8 +36,9 @@ run_mpv_streamlink(const char *url, const char *q)
         char *cmd;
 
         if (sys_session_graphical())
-                cmd = printma("nohup %s -x \"streamlink --player=mpv '%s' '%s'\" "
-                                ">/dev/null 2>&1 &", cfg.x11_term, url, q);
+                cmd = printma("nohup %s -e sh -c \"streamlink --player=mpv '%s'"
+                                " '%s'\" >/dev/null 2>&1 &",
+                                cfg.x11_term, url, q);
         else
                 cmd = printma("streamlink --player=mpv '%s' '%s'", url, q);
         if (!cmd)
