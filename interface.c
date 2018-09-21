@@ -116,7 +116,7 @@ nc_status_write(const char *fmt, ...)
 {
         va_list ap;
 
-        wclear(nc.status);
+        werase(nc.status);
         va_start(ap, fmt);
         vw_printw(nc.status, fmt, ap);
         va_end(ap);
@@ -276,7 +276,7 @@ nc_pad_draw(struct nc_svc *svc, char **chan, char **game, char **extra,
 
         if (!svc->pad)
                 return;
-        wclear(svc->pad);
+        werase(svc->pad);
         if (!svc->n_entry) {
                 wattron(svc->pad, A_BLINK);
                 mvwaddstr(svc->pad, 0, 0, "nothing here but us chickens");
@@ -510,7 +510,7 @@ quality_fetch:
         nc_status_write("%s: available stream qualities for %s", svc->name,
                         svc->chans(svc)[nc.svc[nc.cur_src].cur]);
         wrefresh(nc.status);
-        wclear(nc.svc[nc.cur_src].pad);
+        werase(nc.svc[nc.cur_src].pad);
         mvwaddstr(nc.svc[nc.cur_src].pad, 0, 0, s_qualitydata);
         free(s_qualitydata);
         prefresh(nc.svc[nc.cur_src].pad, 0, 0, 0, 0, nc.h - 2, nc.w - 1);
