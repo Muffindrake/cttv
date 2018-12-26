@@ -7,7 +7,11 @@ a terminal-based program for managing following streamers on different platforms
 This is a program used for better managing of different streaming
 services to reduce the fatigue, memory usage and general inefficiency of having
 to browse multiple tabs in a web browser.
-It uses either youtube-dl or streamlink to play a stream in mpv.
+It plays a stream in mpv, usually using its youtube-dl hook script.
+
+`streamlink` may be sometimes used where youtube-dl has absolutely no support
+for a platform, which is increasingly less true as youtube-dl accumulates
+everything into itself like a kitchen sink.
 
 Refer to the manpage `cttv.1` for general usage instructions.
 
@@ -28,7 +32,7 @@ program will not start, placed into the appropriate directories.
 - C11-compliant compiler
 - mpv
 - youtube-dl
-- streamlink
+- streamlink (optional, ytdl is always preferred; noted where _required_)
 - sh-compatible shell
 
 The following libraries need to be present, runtime and development headers:

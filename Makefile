@@ -15,8 +15,7 @@ DEPS = $(patsubst %.c,$(DIR_BUILD)/%.d,$(SRCS))
 OPTLEVEL ?= -O3 -march=native -flto
 PREFIX ?= /usr/local
 
-$(info mkdir -p $(DIR_BUILD))
-$(shell mkdir -p $(DIR_BUILD))
+$(info $(shell mkdir -p $(DIR_BUILD)))
 
 $(DIR_BUILD)/%.o: %.c
 	$(CC) $(OPTLEVEL) $(CFLAGS) $(OPTLEVEL) -o $@ -c -MMD $<

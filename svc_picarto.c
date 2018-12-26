@@ -215,18 +215,31 @@ const char *
 ptv_stream_play(const struct svc *svc, const char *c, const char *q)
 {
         (void) svc;
-        (void) q;
         const char *ret;
         char *url;
 
         url = printma("https://picarto.tv/%s", c);
         if (!url)
                 return ERR_MEM;
-        ret = run_mpv_streamlink(url, "best");
+        ret = run_mpv_ytdl(url, q);
         free(url);
         return ret;
 }
 
+char *
+ptv_stream_quality(const struct svc *svc, const char *c)
+{
+        (void) svc;
+        char *ret;
+        char *url;
+
+        url = printma("https://picarto.tv/%s", c);
+        if (!url)
+                return 0;
+        ret = quality_ytdl(url);
+        free(url);
+        return ret;
+}
 void
 ptv_cleanup(struct svc *svc)
 {

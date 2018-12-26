@@ -59,7 +59,7 @@ quality_ytdl(const char *url)
 
         argv[0] = "sh";
         argv[1] = "-c";
-        argv[2] = printma("youtube-dl -F '%s' 2>/dev/null "
+        argv[2] = printma("youtube-dl --socket-timeout 20 -F '%s' 2>/dev/null "
                         "| sed "
                         "-e '/^\\[.*/d' "
                         "-e '/^format code.*/d' "
