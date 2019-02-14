@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include <curl/curl.h>
 #include <glib.h>
@@ -24,7 +25,8 @@ struct ttv_s {
 
 static
 size_t
-ttv_partition(struct svc *svc, size_t low, size_t high)
+ttv_partition(struct svc *svc, size_t low, size_t high,
+        int (*compare)(const char *, const char *))
 {
         struct ttv_s *ttv = svc->handle;
         char *swp;
@@ -36,11 +38,11 @@ ttv_partition(struct svc *svc, size_t low, size_t high)
 inf:
         do {
                 i++;
-                res = strcmp(ttv->offs_name[i], ttv->offs_name[low]);
+                res = compare(ttv->offs_name[i], ttv->offs_name[low]);
         } while (res < 0);
         do {
                 high--;
-                res = strcmp(ttv->offs_name[high], ttv->offs_name[low]);
+                res = compare(ttv->offs_name[high], ttv->offs_name[low]);
         } while (res > 0);
         if (i >= high)
                 return high;
@@ -58,15 +60,16 @@ inf:
 
 static
 void
-ttv_quicksort(struct svc *svc, size_t low, size_t high)
+ttv_quicksort(struct svc *svc, size_t low, size_t high,
+        int (*compare)(const char *, const char *))
 {
         size_t ret;
 
         if (low >= high)
                 return;
-        ret = ttv_partition(svc, low, high);
-        ttv_quicksort(svc, low, ret);
-        ttv_quicksort(svc, ret + 1, high);
+        ret = ttv_partition(svc, low, high, compare);
+        ttv_quicksort(svc, low, ret, compare);
+        ttv_quicksort(svc, ret + 1, high, compare);
 }
 
 static
@@ -86,9 +89,9 @@ ttv_nonlocal_free(struct svc *svc)
 }
 
 #define TTVAPI \
-"https://api.twitch.tv/kraken/streams?channel=%s"\
-"&limit=100&stream_type=live&api_version=3"\
-"&client_id=%s"
+"https://api.twitch.tv/helix/streams?first=100%s"
+#define TTVAPI_USERNAME "&user_login="
+
 
 static
 char *
@@ -99,18 +102,38 @@ ttv_url_build(struct svc* svc)
         char *ret;
         size_t i;
         size_t len;
+        size_t len_left;
+        size_t pos;
+        int off;
 
         if (!ttv->local.offs_len)
                 return 0;
-        len = ttv->local.data_len + 1;
+        ret = 0;
+        len = ttv->local.data_len + 1
+                + ttv->local.offs_len * (sizeof TTVAPI_USERNAME - 1);
         buf = malloc(len);
         if (!buf)
                 return 0;
-        memcpy(buf, ttv->local.data, len);
-        buf[ttv->local.data_len] = 0;
-        for (i = 0; i < len - 2; i++) if (!buf[i])
-                buf[i] = ',';
-        ret = printma(TTVAPI, buf, svc->api_key);
+        len_left = len - 1;
+        pos = 0;
+        for (i = 0; i < ttv->local.offs_len; i++) {
+                off = snprintf(buf + pos, len_left, "%s%s",
+                                TTVAPI_USERNAME, ttv->local.offs[i]);
+                if (off <= 0)
+                        goto fail;
+                if (len_left && (size_t) off > len_left)
+                        len_left = 0;
+                else if (!len_left)
+                        ;
+                else
+                        len_left -= off;
+                if ((size_t) off > (len - 2) - pos)
+                        pos += (len - 2) - pos;
+                else
+                        pos += off;
+        }
+        ret = printma(TTVAPI, buf);
+fail:
         free(buf);
         return ret;
 }
@@ -118,10 +141,9 @@ ttv_url_build(struct svc* svc)
 #define ERR_JSON_PARSE "unable to parse json"
 #define ERR_JSON_ARRAY "unable to obtain array"
 #define ERR_JSON_NOELEM "unable to obtain element from array"
-#define ERR_JSON_NOCHAN "unable to obtain channel from element"
-#define ERR_JSON_NOCHANGAME "unable to obtain game from channel"
-#define ERR_JSON_NOCHANNAME "unable to obtain name from channel"
-#define ERR_JSON_NOCHANSTATUS "unable to obtain status from channel"
+#define ERR_JSON_NOCHANGAME "unable to obtain game_id from channel"
+#define ERR_JSON_NOCHANNAME "unable to obtain user_name from channel"
+#define ERR_JSON_NOCHANSTATUS "unable to obtain title from channel"
 
 static
 const char *
@@ -137,7 +159,6 @@ ttv_json_parse(struct svc *svc, const char *json)
         json_t *root;
         json_t *streams;
         json_t *element;
-        json_t *chan;
         json_t *chan_name;
         json_t *chan_game;
         json_t *chan_status;
@@ -148,7 +169,7 @@ ttv_json_parse(struct svc *svc, const char *json)
         root = json_loads(json, 0, 0);
         if (!root)
                 return ERR_JSON_PARSE;
-        streams = json_object_get(root, "streams");
+        streams = json_object_get(root, "data");
         if (!streams || JSON_ARRAY != json_typeof(streams)) {
                 err = ERR_JSON_ARRAY;
                 goto cleanup;
@@ -164,24 +185,19 @@ ttv_json_parse(struct svc *svc, const char *json)
                         err = ERR_JSON_NOELEM;
                         goto cleanup;
                 }
-                chan = json_object_get(element, "channel");
-                if (!chan) {
-                        err = ERR_JSON_NOCHAN;
-                        goto cleanup;
-                }
-                chan_name = json_object_get(chan, "name");
+                chan_name = json_object_get(element, "user_name");
                 if (!chan_name || json_typeof(chan_name) != JSON_STRING) {
                         err = ERR_JSON_NOCHANNAME;
                         goto cleanup;
                 }
                 offs_name += json_string_length(chan_name) + 1;
-                chan_game = json_object_get(chan, "game");
+                chan_game = json_object_get(element, "game_id");
                 if (!chan_game || json_typeof(chan_game) != JSON_STRING) {
                         err = ERR_JSON_NOCHANGAME;
                         goto cleanup;
                 }
                 offs_game += json_string_length(chan_game) + 1;
-                chan_status = json_object_get(chan, "status");
+                chan_status = json_object_get(element, "title");
                 if (!chan_status || json_typeof(chan_status) != JSON_STRING) {
                         err = ERR_JSON_NOCHANSTATUS;
                         goto cleanup;
@@ -191,6 +207,10 @@ ttv_json_parse(struct svc *svc, const char *json)
         offs_sum = offs_name + offs_game + offs_status;
         ttv->data_name = malloc(offs_sum + offs_sum % sizeof (void *)
                         + sizeof (void *) * 3 * ttv->up_cnt);
+        if (!ttv->data_name) {
+                err = ERR_MEM;
+                goto cleanup;
+        }
         ttv->data_game = ttv->data_name + offs_name;
         ttv->data_status = ttv->data_game + offs_game;
         ttv->offs_name = (char **)(ttv->data_status + offs_status
@@ -202,23 +222,22 @@ ttv_json_parse(struct svc *svc, const char *json)
         offs_status = 0;
         for (i = 0; i < ttv->up_cnt; i++) {
                 element = json_array_get(streams, i);
-                chan = json_object_get(element, "channel");
-                chan_name = json_object_get(chan, "name");
+                chan_name = json_object_get(element, "user_name");
                 ttv->offs_name[i] = ttv->data_name + offs_name;
                 strcpy(ttv->offs_name[i], json_string_value(chan_name));
                 murderize_single_quotes(ttv->offs_name[i]);
                 offs_name += json_string_length(chan_name) + 1;
-                chan_game = json_object_get(chan, "game");
+                chan_game = json_object_get(element, "game_id");
                 ttv->offs_game[i] = ttv->data_game + offs_game;
                 strcpy(ttv->offs_game[i], json_string_value(chan_game));
                 offs_game += json_string_length(chan_game) + 1;
-                chan_status = json_object_get(chan, "status");
+                chan_status = json_object_get(element, "title");
                 ttv->offs_status[i] = ttv->data_status + offs_status;
                 strcpy(ttv->offs_status[i], json_string_value(chan_status));
                 offs_status += json_string_length(chan_status) + 1;
         }
         if (ttv->up_cnt > 1)
-                ttv_quicksort(svc, 0, ttv->up_cnt - 1);
+                ttv_quicksort(svc, 0, ttv->up_cnt - 1, strcasecmp);
 cleanup:
         json_decref(root);
         return err;
@@ -250,21 +269,55 @@ ttv_perform(struct svc *svc)
 {
         const char *err;
         char *url;
-        char *res;
+        char *auth;
+        struct curl_cb_data buf_ret;
+        struct curl_slist *list;
+        CURL *crl;
+        CURLcode crlcode;
 
+        if (!svc->api_key)
+                return "No Twitch client ID in configuration";
+        buf_ret = (struct curl_cb_data) {0};
         err = 0;
+        list = 0;
+        auth = 0;
+        crl = 0;
         url = ttv_url_build(svc);
         if (!url)
                 return ERR_MEM;
-        res = request_single_sync(url, &err);
+        auth = printma("Client-ID: %s", svc->api_key);
+        if (!auth) {
+                err = ERR_MEM;
+                goto fail;
+        }
+        crl = curl_easy_init();
+        if (!crl) {
+                err = ERR_CURL_INIT;
+                goto fail;
+        }
+        curl_easy_setopt(crl, CURLOPT_URL, url);
         free(url);
-        if (!res)
-                return err;
-        err = ttv_json_parse(svc, res);
-        free(res);
-        if (err)
-                return err;
-        return 0;
+        url = 0;
+        curl_easy_setopt(crl, CURLOPT_WRITEFUNCTION, curl_callback_mem_write);
+        curl_easy_setopt(crl, CURLOPT_WRITEDATA, &buf_ret);
+        list = curl_slist_append(list, auth);
+        free(auth);
+        auth = 0;
+        curl_easy_setopt(crl, CURLOPT_HTTPHEADER, list);
+        crlcode = curl_easy_perform(crl);
+        curl_easy_cleanup(crl);
+        curl_slist_free_all(list);
+        if (crlcode != CURLE_OK)
+                return curl_easy_strerror(crlcode);
+        err = ttv_json_parse(svc, buf_ret.p);
+        free(buf_ret.p);
+        return err;
+fail:
+        free(url);
+        free(auth);
+        curl_easy_cleanup(crl);
+        curl_slist_free_all(list);
+        return err;
 }
 
 const char *

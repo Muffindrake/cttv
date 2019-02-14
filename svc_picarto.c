@@ -206,9 +206,7 @@ ptv_perform(struct svc *svc)
                 return curl_easy_strerror(crlcode);
         err = ptv_json_parse(svc, buf_ret.p);
         free(buf_ret.p);
-        if (err)
-                return err;
-        return 0;
+        return err;
 }
 
 const char *
